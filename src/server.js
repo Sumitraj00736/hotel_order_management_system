@@ -5,7 +5,7 @@ const { Server } = require('socket.io');
 const app = require('./app');
 const { attachSocket } = require('./utils/socket');
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT
 const MONGO_URI = process.env.MONGO_URI;
 
 const server = http.createServer(app);
