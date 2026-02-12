@@ -5,7 +5,19 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'waiter', 'kitchen'], required: true }
+    role: { type: String, enum: ['admin', 'waiter', 'kitchen'], required: true },
+    dateOfJoining: { type: Date },
+    salary: { type: Number, min: 0 },
+    shiftStart: { type: String, trim: true },
+    shiftEnd: { type: String, trim: true },
+    promotions: [
+      {
+        title: { type: String, required: true, trim: true },
+        amount: { type: Number, min: 0 },
+        effectiveDate: { type: Date, required: true },
+        note: { type: String, trim: true }
+      }
+    ]
   },
   { timestamps: true }
 );

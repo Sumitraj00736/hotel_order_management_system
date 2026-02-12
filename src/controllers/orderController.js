@@ -1,7 +1,7 @@
 const Order = require('../models/Order');
 const MenuItem = require('../models/MenuItem');
 const Table = require('../models/Table');
-const { emitNewOrder, emitOrderUpdate } = require('../utils/socket');
+const { emitNewOrder, emitOrderUpdate, emitTableUpdate } = require('../utils/socket');
 const { notifyRole, notifyUser } = require('../utils/notify');
 
 const buildOrderItems = async (items) => {
@@ -67,10 +67,13 @@ const getOrder = async (req, res) => {
 
 const createOrder = async (req, res) => {
   try {
-    const { table, items } = req.body;
+    const { table, items, spiceLevel, specialInstructions } = req.body;
     const tableDoc = await Table.findById(table);
     if (!tableDoc) {
       return res.status(404).json({ message: 'Table not found' });
+    }
+    if (tableDoc.status === 'occupied') {
+      return res.status(400).json({ message: 'Table already occupied' });
     }
 
     const { orderItems, totalAmount } = await buildOrderItems(items);
@@ -79,11 +82,14 @@ const createOrder = async (req, res) => {
       items: orderItems,
       totalAmount,
       status: 'pending',
-      createdBy: req.user._id
+      createdBy: req.user._id,
+      spiceLevel: spiceLevel || 'medium',
+      specialInstructions
     });
 
     tableDoc.status = 'occupied';
     await tableDoc.save();
+    emitTableUpdate(tableDoc);
 
     const populated = await Order.findById(order._id)
       .populate('table')
@@ -147,6 +153,16 @@ const updateOrder = async (req, res) => {
       order.items = orderItems;
       order.totalAmount = totalAmount;
       changes.push('items updated');
+    }
+
+    if (req.body.spiceLevel) {
+      order.spiceLevel = req.body.spiceLevel;
+      changes.push(`spice level -> ${req.body.spiceLevel}`);
+    }
+
+    if (req.body.specialInstructions !== undefined) {
+      order.specialInstructions = req.body.specialInstructions;
+      changes.push('instructions updated');
     }
 
     if (req.body.status && req.user.role !== 'waiter') {

@@ -17,7 +17,11 @@ router.post(
     body('name').notEmpty(),
     body('email').isEmail(),
     body('password').isLength({ min: 6 }),
-    body('role').isIn(['admin', 'waiter', 'kitchen'])
+    body('role').isIn(['admin', 'waiter', 'kitchen']),
+    body('dateOfJoining').optional().isISO8601(),
+    body('salary').optional().isFloat({ min: 0 }),
+    body('shiftStart').optional().isString(),
+    body('shiftEnd').optional().isString()
   ],
   validate,
   createUser
@@ -27,7 +31,11 @@ router.put(
   [
     body('email').optional().isEmail(),
     body('password').optional().isLength({ min: 6 }),
-    body('role').optional().isIn(['admin', 'waiter', 'kitchen'])
+    body('role').optional().isIn(['admin', 'waiter', 'kitchen']),
+    body('dateOfJoining').optional().isISO8601(),
+    body('salary').optional().isFloat({ min: 0 }),
+    body('shiftStart').optional().isString(),
+    body('shiftEnd').optional().isString()
   ],
   validate,
   updateUser

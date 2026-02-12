@@ -19,7 +19,9 @@ router.post(
     body('table').notEmpty(),
     body('items').isArray({ min: 1 }),
     body('items.*.menuItem').notEmpty(),
-    body('items.*.quantity').isInt({ min: 1 })
+    body('items.*.quantity').isInt({ min: 1 }),
+    body('spiceLevel').optional().isIn(['mild', 'medium', 'spicy', 'extra_spicy']),
+    body('specialInstructions').optional().isString().isLength({ max: 500 })
   ],
   validate,
   createOrder
@@ -32,7 +34,9 @@ router.put(
     body('table').optional().notEmpty(),
     body('items').optional().isArray({ min: 1 }),
     body('items.*.menuItem').optional().notEmpty(),
-    body('items.*.quantity').optional().isInt({ min: 1 })
+    body('items.*.quantity').optional().isInt({ min: 1 }),
+    body('spiceLevel').optional().isIn(['mild', 'medium', 'spicy', 'extra_spicy']),
+    body('specialInstructions').optional().isString().isLength({ max: 500 })
   ],
   validate,
   updateOrder

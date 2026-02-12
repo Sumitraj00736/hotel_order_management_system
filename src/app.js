@@ -10,6 +10,8 @@ const orderRoutes = require('./routes/orderRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const billRoutes = require('./routes/billRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const profileRoutes = require('./routes/profileRoutes');
+const promotionRoutes = require('./routes/promotionRoutes');
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/promotions', promotionRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Not Found' });

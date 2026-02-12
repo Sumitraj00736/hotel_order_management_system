@@ -1,7 +1,7 @@
 const Order = require('../models/Order');
 const Table = require('../models/Table');
 const CustomerHistory = require('../models/CustomerHistory');
-const { emitOrderUpdate } = require('../utils/socket');
+const { emitOrderUpdate, emitTableUpdate } = require('../utils/socket');
 const { notifyRole, notifyUser } = require('../utils/notify');
 
 const generateBill = async (req, res) => {
@@ -64,7 +64,10 @@ const payBill = async (req, res) => {
     order.paidBy = req.user._id;
     await order.save();
 
-    await Table.findByIdAndUpdate(order.table._id, { status: 'available' });
+    const updatedTable = await Table.findByIdAndUpdate(order.table._id, { status: 'available' }, { new: true });
+    if (updatedTable) {
+      emitTableUpdate(updatedTable);
+    }
 
     const existingHistory = await CustomerHistory.findOne({ orderId: order._id });
     if (!existingHistory) {

@@ -19,6 +19,8 @@ const orderSchema = new mongoose.Schema(
       enum: ['pending', 'preparing', 'ready', 'served', 'paid'],
       default: 'pending'
     },
+    spiceLevel: { type: String, enum: ['mild', 'medium', 'spicy', 'extra_spicy'], default: 'medium' },
+    specialInstructions: { type: String, trim: true },
     kitchenAssigned: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     kitchenAssignedAt: { type: Date },
     paymentMethod: { type: String, enum: ['cash', 'fonepay'] },

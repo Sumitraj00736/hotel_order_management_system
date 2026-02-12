@@ -16,13 +16,22 @@ const getUser = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, dateOfJoining, salary, shiftStart, shiftEnd } = req.body;
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ message: 'Email already in use' });
     }
     const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, password: hashed, role });
+    const user = await User.create({
+      name,
+      email,
+      password: hashed,
+      role,
+      dateOfJoining,
+      salary,
+      shiftStart,
+      shiftEnd
+    });
     return res.status(201).json({ id: user._id, name, email, role: user.role });
   } catch (error) {
     return res.status(500).json({ message: 'Create user failed', error: error.message });
@@ -31,7 +40,7 @@ const createUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const { name, email, role, password } = req.body;
+    const { name, email, role, password, dateOfJoining, salary, shiftStart, shiftEnd } = req.body;
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -47,6 +56,10 @@ const updateUser = async (req, res) => {
 
     if (name) user.name = name;
     if (role) user.role = role;
+    if (dateOfJoining) user.dateOfJoining = dateOfJoining;
+    if (salary !== undefined) user.salary = salary;
+    if (shiftStart) user.shiftStart = shiftStart;
+    if (shiftEnd) user.shiftEnd = shiftEnd;
     if (password) user.password = await bcrypt.hash(password, 10);
 
     await user.save();
