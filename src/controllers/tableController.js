@@ -1,9 +1,10 @@
 const Table = require('../models/Table');
+const Order = require('../models/Order');
 const { emitTableUpdate } = require('../utils/socket');
 const { notifyRole } = require('../utils/notify');
 
 const listTables = async (req, res) => {
-  const tables = await Table.find().sort({ tableNumber: 1 });
+  const tables = await Table.find().sort({ row: 1, column: 1, tableNumber: 1 });
   return res.json(tables);
 };
 
@@ -49,6 +50,13 @@ const freeTable = async (req, res) => {
   if (!table) {
     return res.status(404).json({ message: 'Table not found' });
   }
+
+  // Prevent freeing a table that still has active orders
+  const activeOrder = await Order.findOne({ table: table._id, status: { $ne: 'paid' } });
+  if (activeOrder) {
+    return res.status(400).json({ message: 'Cannot free table with active orders' });
+  }
+
   table.status = 'available';
   await table.save();
   emitTableUpdate(table);

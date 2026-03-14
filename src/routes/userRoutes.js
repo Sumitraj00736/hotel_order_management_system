@@ -16,6 +16,7 @@ router.post(
   [
     body('name').notEmpty(),
     body('email').isEmail(),
+    body('phone').optional().isString(),
     body('password').isLength({ min: 6 }),
     body('role').isIn(['admin', 'waiter', 'kitchen']),
     body('dateOfJoining').optional().isISO8601(),
@@ -30,6 +31,7 @@ router.put(
   '/:id',
   [
     body('email').optional().isEmail(),
+    body('phone').optional().isString(),
     body('password').optional().isLength({ min: 6 }),
     body('role').optional().isIn(['admin', 'waiter', 'kitchen']),
     body('dateOfJoining').optional().isISO8601(),

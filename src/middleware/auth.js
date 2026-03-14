@@ -10,7 +10,10 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Missing token' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret');
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT secret missing');
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
 
     if (!user) {

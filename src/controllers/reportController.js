@@ -17,7 +17,15 @@ const summaryReport = async (req, res) => {
 const overviewReport = async (req, res) => {
   const activeOrders = await Order.find({ status: { $in: ['pending', 'preparing', 'ready', 'served'] } })
     .populate('table')
-    .populate('createdBy', 'name email');
+    .populate('createdBy', 'name email')
+    .populate('kitchenAssigned', 'name email');
+
+  const unpaidOrders = await Order.countDocuments({ status: { $ne: 'paid' } });
+  const statusCountsAgg = await Order.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]);
+  const statusCounts = statusCountsAgg.reduce((acc, row) => {
+    acc[row._id] = row.count;
+    return acc;
+  }, {});
 
   const activeByWaiter = activeOrders.reduce((acc, order) => {
     const waiterName = order.createdBy?.name || 'Unknown';
@@ -30,8 +38,34 @@ const overviewReport = async (req, res) => {
     return acc;
   }, {});
 
-  const result = Object.entries(activeByWaiter).map(([waiter, tables]) => ({ waiter, tables }));
-  return res.json({ activeByWaiter: result });
+  const waiterList = Object.entries(activeByWaiter).map(([waiter, tables]) => ({ waiter, tables }));
+
+  const kitchenLoadsMap = activeOrders.reduce((acc, order) => {
+    const kitchenName = order.kitchenAssigned?.name || 'Unassigned';
+    if (!acc[kitchenName]) acc[kitchenName] = 0;
+    acc[kitchenName] += 1;
+    return acc;
+  }, {});
+  const kitchenLoads = Object.entries(kitchenLoadsMap).map(([name, orders]) => ({ name, orders }));
+
+  const topWaiter =
+    waiterList.length > 0
+      ? waiterList.reduce((best, w) => (w.tables.length > (best?.tables.length || 0) ? w : best), null)
+      : null;
+  const topKitchen =
+    kitchenLoads.length > 0
+      ? kitchenLoads.reduce((best, k) => (k.orders > (best?.orders || 0) ? k : best), null)
+      : null;
+
+  return res.json({
+    activeByWaiter: waiterList,
+    activeOrders: activeOrders.length,
+    unpaidOrders,
+    statusCounts,
+    kitchenLoads,
+    topWaiter,
+    topKitchen
+  });
 };
 
 const monthsAgo = (months) => {

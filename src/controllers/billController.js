@@ -15,6 +15,11 @@ const generateBill = async (req, res) => {
     return res.status(404).json({ message: 'Order not found' });
   }
 
+  // Only allow waiters to view bills for orders they created
+  if (req.user.role === 'waiter' && order.createdBy?._id?.toString() !== req.user._id.toString()) {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+
   const bill = {
     orderId: order._id,
     tableNumber: order.table?.tableNumber,
@@ -51,6 +56,11 @@ const payBill = async (req, res) => {
 
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Only allow waiters to pay their own orders
+    if (req.user.role === 'waiter' && order.createdBy?._id?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Forbidden' });
     }
 
     if (order.status === 'paid') {

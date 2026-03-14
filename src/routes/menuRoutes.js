@@ -15,7 +15,12 @@ router.get('/:id', getMenuItem);
 router.post(
   '/',
   requireRole('admin'),
-  [body('name').notEmpty(), body('category').notEmpty(), body('price').isFloat({ min: 0 })],
+  [
+    body('name').notEmpty(),
+    body('category').notEmpty(),
+    body('price').isFloat({ min: 0 }),
+    body('imageUrl').optional().isURL()
+  ],
   validate,
   createMenuItem
 );
@@ -25,7 +30,8 @@ router.put(
   [
     body('name').optional().notEmpty(),
     body('category').optional().notEmpty(),
-    body('price').optional().isFloat({ min: 0 })
+    body('price').optional().isFloat({ min: 0 }),
+    body('imageUrl').optional().isURL()
   ],
   validate,
   updateMenuItem

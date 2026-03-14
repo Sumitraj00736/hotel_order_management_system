@@ -15,14 +15,18 @@ router.get('/:id', getTable);
 router.post(
   '/',
   requireRole('admin'),
-  [body('tableNumber').isInt({ min: 1 })],
+  [body('tableNumber').isInt({ min: 1 }), body('row').optional().isInt({ min: 1 }), body('column').optional().isInt({ min: 1 })],
   validate,
   createTable
 );
 router.put(
   '/:id',
   requireRole('admin'),
-  [body('status').optional().isIn(['available', 'occupied'])],
+  [
+    body('status').optional().isIn(['available', 'occupied']),
+    body('row').optional().isInt({ min: 1 }),
+    body('column').optional().isInt({ min: 1 })
+  ],
   validate,
   updateTable
 );
