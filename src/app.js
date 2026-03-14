@@ -19,7 +19,12 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 
 const app = express();
 
-const defaultOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const defaultOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'https://hoteloms.netlify.app',
+  'https://hotel-order-management-system.onrender.com'
+];
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map((o) => o.trim())
