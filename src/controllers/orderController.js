@@ -409,6 +409,12 @@ const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
+    if (order.status === 'paid') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: 'Paid orders cannot be updated' });
+    }
+
     if (req.user.role === 'kitchen' && !order.kitchenAssigned) {
       order.kitchenAssigned = req.user._id;
       order.kitchenAssignedAt = new Date();
