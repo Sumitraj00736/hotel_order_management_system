@@ -27,7 +27,10 @@ const orderSchema = new mongoose.Schema(
     paymentRemark: { type: String },
     paidAt: { type: Date },
     paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    source: { type: String, enum: ['staff', 'guest'], default: 'staff' },
+    guestName: { type: String, trim: true },
+    guestSession: { type: String, trim: true },
     editLogs: [
       {
         editedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

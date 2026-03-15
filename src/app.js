@@ -16,6 +16,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const promotionRoutes = require('./routes/promotionRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
+const guestRoutes = require('./routes/guestRoutes');
 
 const app = express();
 
@@ -86,6 +87,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/promotions', promotionRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/guest', guestRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Not Found' });

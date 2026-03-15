@@ -144,7 +144,7 @@ const listOrders = async (req, res) => {
   }
 
   if (req.user.role === 'waiter') {
-    filter.createdBy = req.user._id;
+    filter.$or = [{ createdBy: req.user._id }, { source: 'guest' }];
   }
 
   const orders = await Order.find(filter)
