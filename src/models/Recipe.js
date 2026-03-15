@@ -10,6 +10,7 @@ const recipeComponentSchema = new mongoose.Schema(
 
 const recipeSchema = new mongoose.Schema(
   {
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
     menuItem: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true, unique: true },
     ingredients: { type: [recipeComponentSchema], required: true }
   },

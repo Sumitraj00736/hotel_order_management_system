@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, param } = require('express-validator');
 const auth = require('../middleware/auth');
+const branchScope = require('../middleware/branchScope');
 const requireRole = require('../middleware/requireRole');
 const validate = require('../middleware/validate');
 const {
@@ -16,7 +17,7 @@ const {
 
 const router = express.Router();
 
-router.use(auth, requireRole('admin'));
+router.use(auth, branchScope, requireRole('admin'));
 
 router.get('/ingredients', listIngredients);
 router.post(

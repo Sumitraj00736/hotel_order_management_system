@@ -11,6 +11,7 @@ const historyItemSchema = new mongoose.Schema(
 
 const customerHistorySchema = new mongoose.Schema(
   {
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true, unique: true },
     tableNumber: { type: Number, required: true },
     items: { type: [historyItemSchema], required: true },

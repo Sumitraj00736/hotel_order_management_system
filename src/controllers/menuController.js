@@ -3,6 +3,7 @@ const MenuItem = require('../models/MenuItem');
 const listMenu = async (req, res) => {
   const { search, category, available } = req.query;
   const filter = {};
+  if (req.branchId) filter.branchId = req.branchId;
   if (category) filter.category = category;
   if (available !== undefined) filter.isAvailable = available === 'true';
   if (search) filter.name = { $regex: search, $options: 'i' };
@@ -12,7 +13,7 @@ const listMenu = async (req, res) => {
 };
 
 const getMenuItem = async (req, res) => {
-  const item = await MenuItem.findById(req.params.id);
+  const item = await MenuItem.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
   if (!item) {
     return res.status(404).json({ message: 'Menu item not found' });
   }
@@ -21,7 +22,7 @@ const getMenuItem = async (req, res) => {
 
 const createMenuItem = async (req, res) => {
   try {
-    const item = await MenuItem.create(req.body);
+    const item = await MenuItem.create({ ...req.body, branchId: req.branchId });
     return res.status(201).json(item);
   } catch (error) {
     return res.status(500).json({ message: 'Create menu item failed', error: error.message });
@@ -30,7 +31,11 @@ const createMenuItem = async (req, res) => {
 
 const updateMenuItem = async (req, res) => {
   try {
-    const item = await MenuItem.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const item = await MenuItem.findOneAndUpdate(
+      { _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) },
+      req.body,
+      { new: true }
+    );
     if (!item) {
       return res.status(404).json({ message: 'Menu item not found' });
     }
@@ -41,7 +46,7 @@ const updateMenuItem = async (req, res) => {
 };
 
 const deleteMenuItem = async (req, res) => {
-  const item = await MenuItem.findByIdAndDelete(req.params.id);
+  const item = await MenuItem.findOneAndDelete({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
   if (!item) {
     return res.status(404).json({ message: 'Menu item not found' });
   }

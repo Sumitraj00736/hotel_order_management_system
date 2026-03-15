@@ -3,7 +3,9 @@ const Recipe = require('../models/Recipe');
 const StockTransaction = require('../models/StockTransaction');
 
 const listIngredients = async (req, res) => {
-  const ingredients = await Ingredient.find().sort({ name: 1 });
+  const filter = {};
+  if (req.branchId) filter.branchId = req.branchId;
+  const ingredients = await Ingredient.find(filter).sort({ name: 1 });
   return res.json(ingredients);
 };
 
@@ -16,7 +18,8 @@ const createIngredient = async (req, res) => {
       currentStock,
       initialStock: currentStock,
       reorderLevel,
-      sku
+      sku,
+      branchId: req.branchId
     });
     return res.status(201).json(ingredient);
   } catch (error) {
@@ -46,7 +49,7 @@ const restockIngredient = async (req, res) => {
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: 'Amount must be positive' });
     }
-    const ingredient = await Ingredient.findById(req.params.id);
+    const ingredient = await Ingredient.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
     if (!ingredient) {
       return res.status(404).json({ message: 'Ingredient not found' });
     }
@@ -55,6 +58,7 @@ const restockIngredient = async (req, res) => {
     await ingredient.save();
 
     await StockTransaction.create({
+      branchId: req.branchId,
       ingredient: ingredient._id,
       delta: amount,
       reason: 'restock',
@@ -69,6 +73,7 @@ const restockIngredient = async (req, res) => {
 
 const listTransactions = async (req, res) => {
   const filter = {};
+  if (req.branchId) filter.branchId = req.branchId;
   if (req.query.ingredient) filter.ingredient = req.query.ingredient;
   const txns = await StockTransaction.find(filter)
     .populate('ingredient', 'name unit')

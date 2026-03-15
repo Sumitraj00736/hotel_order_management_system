@@ -1,13 +1,14 @@
 const express = require('express');
 const { body } = require('express-validator');
 const auth = require('../middleware/auth');
+const branchScope = require('../middleware/branchScope');
 const requireRole = require('../middleware/requireRole');
 const validate = require('../middleware/validate');
 const { listTables, getTable, createTable, updateTable, deleteTable, freeTable } = require('../controllers/tableController');
 
 const router = express.Router();
 
-router.use(auth);
+router.use(auth, branchScope);
 
 router.get('/', listTables);
 router.get('/:id', getTable);

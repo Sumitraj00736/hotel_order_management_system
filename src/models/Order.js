@@ -11,6 +11,7 @@ const orderItemSchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
     table: { type: mongoose.Schema.Types.ObjectId, ref: 'Table', required: true },
     items: { type: [orderItemSchema], required: true },
     totalAmount: { type: Number, required: true, min: 0 },

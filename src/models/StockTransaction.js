@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const stockTransactionSchema = new mongoose.Schema(
   {
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
     ingredient: { type: mongoose.Schema.Types.ObjectId, ref: 'Ingredient', required: true },
     delta: { type: Number, required: true }, // positive for restock, negative for consumption
     reason: { type: String, enum: ['order', 'restock', 'adjustment'], required: true },

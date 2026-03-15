@@ -2,10 +2,39 @@ const Notification = require('../models/Notification');
 
 const listNotifications = async (req, res) => {
   const { role, _id } = req.user;
+  const {
+    category,
+    type,
+    staffId,
+    tableNumber,
+    dishId,
+    supplierId,
+    customerId,
+    stockItemId,
+    dateFrom,
+    dateTo
+  } = req.query;
+
   const filter = { role };
+  if (req.branchId) filter.branchId = req.branchId;
   filter.$or = [{ userId: _id }, { userId: { $exists: false } }];
 
-  const items = await Notification.find(filter).sort({ createdAt: -1 }).limit(50);
+  if (category) filter.category = category;
+  if (type) filter.type = type;
+  if (staffId) filter.staffId = staffId;
+  if (tableNumber) filter.tableNumber = Number(tableNumber);
+  if (dishId) filter.dishId = dishId;
+  if (supplierId) filter.supplierId = supplierId;
+  if (customerId) filter.customerId = customerId;
+  if (stockItemId) filter.stockItemId = stockItemId;
+
+  if (dateFrom || dateTo) {
+    filter.createdAt = {};
+    if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+    if (dateTo) filter.createdAt.$lte = new Date(dateTo);
+  }
+
+  const items = await Notification.find(filter).sort({ createdAt: -1 }).limit(200);
   return res.json(items);
 };
 

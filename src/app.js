@@ -17,6 +17,10 @@ const profileRoutes = require('./routes/profileRoutes');
 const promotionRoutes = require('./routes/promotionRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const guestRoutes = require('./routes/guestRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const subMenuRoutes = require('./routes/subMenuRoutes');
+const addOnRoutes = require('./routes/addOnRoutes');
+const comboRoutes = require('./routes/comboRoutes');
 
 const app = express();
 
@@ -46,7 +50,7 @@ app.use(
       return callback(null, true);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-branch-id'],
     credentials: true
   })
 );
@@ -88,6 +92,10 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/promotions', promotionRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/guest', guestRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/submenus', subMenuRoutes);
+app.use('/api/addons', addOnRoutes);
+app.use('/api/combos', comboRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Not Found' });

@@ -139,6 +139,7 @@ const applyInventoryDelta = async (oldItems, newItems, orderId, userId, session)
 
 const listOrders = async (req, res) => {
   const filter = {};
+  if (req.branchId) filter.branchId = req.branchId;
   if (req.query.status) {
     filter.status = req.query.status;
   }
@@ -159,7 +160,7 @@ const listOrders = async (req, res) => {
 };
 
 const getOrder = async (req, res) => {
-  const order = await Order.findById(req.params.id)
+  const order = await Order.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })
     .populate('table')
     .populate('items.menuItem')
     .populate('createdBy', 'name email role')
@@ -184,7 +185,7 @@ const createOrder = async (req, res) => {
     session.startTransaction();
 
     const { table, items, spiceLevel, specialInstructions } = req.body;
-    const tableDoc = await Table.findById(table).session(session);
+    const tableDoc = await Table.findOne({ _id: table, ...(req.branchId ? { branchId: req.branchId } : {}) }).session(session);
     if (!tableDoc) {
       await session.abortTransaction();
       session.endSession();
@@ -205,6 +206,7 @@ const createOrder = async (req, res) => {
           items: orderItems,
           totalAmount,
           status: 'pending',
+          branchId: req.branchId,
           createdBy: req.user._id,
           spiceLevel: spiceLevel || 'medium',
           specialInstructions

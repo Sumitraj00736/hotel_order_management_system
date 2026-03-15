@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Branch = require('../models/Branch');
+const Organization = require('../models/Organization');
+const UserBranchRole = require('../models/UserBranchRole');
 
 const createToken = (user) => {
   if (!process.env.JWT_SECRET) {
@@ -13,22 +16,42 @@ const createToken = (user) => {
 
 const register = async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
-    const existing = await User.findOne({ $or: [{ email }, { phone }] });
+    const { name, email, phone, password, cafeName, branchName } = req.body;
+    const normalizedEmail = email?.toLowerCase();
+    const normalizedPhone = phone?.trim();
+    const existing = await User.findOne({
+      $or: [
+        normalizedEmail ? { email: normalizedEmail } : null,
+        normalizedPhone ? { phone: normalizedPhone } : null
+      ].filter(Boolean)
+    });
     if (existing) {
       return res.status(409).json({ message: 'Email or phone already in use' });
     }
 
-    const totalUsers = await User.countDocuments();
-    if (totalUsers > 0) {
-      return res.status(403).json({ message: 'Registration closed. Ask admin to create accounts.' });
-    }
-
     const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, phone, password: hashed, role: 'admin' });
+    const user = await User.create({ name, email: normalizedEmail, phone: normalizedPhone, password: hashed, role: 'admin' });
+
+    // create organization + branch for this cafe
+    const org = await Organization.create({ name: cafeName || `${name}'s Cafe` });
+    const branch = await Branch.create({
+      name: branchName || 'Main Branch',
+      code: `${(branchName || cafeName || 'main').toLowerCase().replace(/\\s+/g, '-')}-${Date.now().toString(36)}`,
+      orgId: org._id
+    });
+    await UserBranchRole.create({ userId: user._id, branchId: branch._id, orgId: org._id, role: 'admin' });
+
     const token = createToken(user);
-    return res.status(201).json({ token, user: { id: user._id, name, email, phone, role: user.role } });
+    return res.status(201).json({
+      token,
+      user: { id: user._id, name, email, phone, role: user.role },
+      branches: [{ branchId: branch._id, branchName: branch.name, code: branch.code, role: 'admin' }]
+    });
   } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || 'field';
+      return res.status(409).json({ message: `${field} already in use` });
+    }
     return res.status(500).json({ message: 'Registration failed', error: error.message });
   }
 };
@@ -47,10 +70,20 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    const memberships = await UserBranchRole.find({ userId: user._id, active: true }).populate('branchId', 'name code');
+    const branches = memberships.map((m) => ({
+      branchId: m.branchId?._id || m.branchId,
+      branchName: m.branchId?.name,
+      code: m.branchId?.code,
+      role: m.role,
+      permissions: m.permissions
+    }));
+
     const token = createToken(user);
     return res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role }
+      user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+      branches
     });
   } catch (error) {
     return res.status(500).json({ message: 'Login failed', error: error.message });
