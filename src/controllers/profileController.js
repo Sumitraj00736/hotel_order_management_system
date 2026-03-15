@@ -16,8 +16,10 @@ const getProfile = async (req, res) => {
 
 const getWaiterAnalytics = async (req, res) => {
   const waiterId = req.user._id;
+  const match = { 'waiter.id': waiterId };
+  if (req.branchId) match.branchId = req.branchId;
   const agg = await CustomerHistory.aggregate([
-    { $match: { 'waiter.id': waiterId } },
+    { $match: match },
     {
       $group: {
         _id: null,

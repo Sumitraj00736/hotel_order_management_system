@@ -1,7 +1,17 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const UserBranchRole = require('../models/UserBranchRole');
+const Branch = require('../models/Branch');
 
 const listUsers = async (req, res) => {
+  if (req.branchId) {
+    const memberships = await UserBranchRole.find({ branchId: req.branchId, active: true }).populate('userId');
+    const users = memberships.map((m) => {
+      const u = m.userId;
+      return u ? { id: u._id, name: u.name, email: u.email, phone: u.phone, role: m.role } : null;
+    }).filter(Boolean);
+    return res.json(users);
+  }
   const users = await User.find().select('-password');
   return res.json(users);
 };
@@ -17,9 +27,19 @@ const getUser = async (req, res) => {
 const createUser = async (req, res) => {
   try {
     const { name, email, phone, password, role, dateOfJoining, salary, shiftStart, shiftEnd } = req.body;
+    if (!req.branchId) {
+      return res.status(400).json({ message: 'Branch required to create user' });
+    }
+
+    const branch = await Branch.findById(req.branchId);
+    if (!branch) return res.status(404).json({ message: 'Branch not found' });
     const existing = await User.findOne({ $or: [{ email }, { phone }] });
     if (existing) {
-      return res.status(409).json({ message: 'Email or phone already in use' });
+      const membership = await UserBranchRole.findOne({ userId: existing._id, branchId: req.branchId, active: true });
+      if (membership) return res.status(409).json({ message: 'User already exists in this branch' });
+      const hashedExisting = existing.password; // reuse stored hash
+      await UserBranchRole.create({ userId: existing._id, branchId: req.branchId, role, orgId: branch.orgId });
+      return res.status(201).json({ id: existing._id, name: existing.name, email: existing.email, role });
     }
     const hashed = await bcrypt.hash(password, 10);
     const user = await User.create({
@@ -33,6 +53,7 @@ const createUser = async (req, res) => {
       shiftStart,
       shiftEnd
     });
+    await UserBranchRole.create({ userId: user._id, branchId: req.branchId, role, orgId: branch.orgId });
     return res.status(201).json({ id: user._id, name, email, role: user.role });
   } catch (error) {
     return res.status(500).json({ message: 'Create user failed', error: error.message });

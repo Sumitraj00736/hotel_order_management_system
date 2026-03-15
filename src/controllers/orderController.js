@@ -7,9 +7,11 @@ const StockTransaction = require('../models/StockTransaction');
 const { emitNewOrder, emitOrderUpdate, emitTableUpdate } = require('../utils/socket');
 const { notifyRole, notifyUser } = require('../utils/notify');
 
-const buildOrderItems = async (items) => {
+const buildOrderItems = async (items, branchId) => {
   const menuIds = items.map((item) => item.menuItem);
-  const menuItems = await MenuItem.find({ _id: { $in: menuIds }, isAvailable: true });
+  const filter = { _id: { $in: menuIds }, isAvailable: true };
+  if (branchId) filter.branchId = branchId;
+  const menuItems = await MenuItem.find(filter);
   if (menuItems.length !== menuIds.length) {
     throw new Error('One or more menu items are unavailable');
   }
@@ -197,7 +199,7 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: 'Table already occupied' });
     }
 
-    const { orderItems, totalAmount } = await buildOrderItems(items);
+    const { orderItems, totalAmount } = await buildOrderItems(items, req.branchId);
     await ensureInventoryAvailability(orderItems);
     const [order] = await Order.create(
       [

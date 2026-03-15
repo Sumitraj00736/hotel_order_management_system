@@ -5,7 +5,7 @@ const { emitOrderUpdate, emitTableUpdate } = require('../utils/socket');
 const { notifyRole, notifyUser } = require('../utils/notify');
 
 const generateBill = async (req, res) => {
-  const order = await Order.findById(req.params.id)
+  const order = await Order.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })
     .populate('table')
     .populate('items.menuItem')
     .populate('createdBy', 'name email role')
@@ -48,7 +48,7 @@ const payBill = async (req, res) => {
       return res.status(400).json({ message: 'Invalid payment method' });
     }
 
-    const order = await Order.findById(req.params.id)
+    const order = await Order.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })
       .populate('table')
       .populate('items.menuItem')
       .populate('createdBy', 'name email role')
@@ -74,7 +74,11 @@ const payBill = async (req, res) => {
     order.paidBy = req.user._id;
     await order.save();
 
-    const updatedTable = await Table.findByIdAndUpdate(order.table._id, { status: 'available' }, { new: true });
+    const updatedTable = await Table.findOneAndUpdate(
+      { _id: order.table._id, ...(req.branchId ? { branchId: req.branchId } : {}) },
+      { status: 'available' },
+      { new: true }
+    );
     if (updatedTable) {
       emitTableUpdate(updatedTable);
     }
@@ -82,6 +86,7 @@ const payBill = async (req, res) => {
     const existingHistory = await CustomerHistory.findOne({ orderId: order._id });
     if (!existingHistory) {
       await CustomerHistory.create({
+        branchId: req.branchId,
         orderId: order._id,
         tableNumber: order.table?.tableNumber,
         items: order.items.map((item) => ({
@@ -117,7 +122,8 @@ const payBill = async (req, res) => {
       type: 'order:paid',
       message: `Payment received for table ${populated.table?.tableNumber} (${paymentMethod})`,
       orderId: populated._id,
-      tableNumber: populated.table?.tableNumber
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
     });
     await notifyUser({
       role: 'waiter',
@@ -125,7 +131,8 @@ const payBill = async (req, res) => {
       type: 'order:paid',
       message: `Order paid for table ${populated.table?.tableNumber} (${paymentMethod})`,
       orderId: populated._id,
-      tableNumber: populated.table?.tableNumber
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
     });
 
     return res.json({ message: 'Payment recorded', orderId: order._id, status: order.status });

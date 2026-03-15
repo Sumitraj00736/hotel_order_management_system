@@ -19,33 +19,49 @@ const register = async (req, res) => {
     const { name, email, phone, password, cafeName, branchName } = req.body;
     const normalizedEmail = email?.toLowerCase();
     const normalizedPhone = phone?.trim();
-    const existing = await User.findOne({
+    let user = await User.findOne({
       $or: [
         normalizedEmail ? { email: normalizedEmail } : null,
         normalizedPhone ? { phone: normalizedPhone } : null
       ].filter(Boolean)
     });
-    if (existing) {
-      return res.status(409).json({ message: 'Email or phone already in use' });
+
+    if (!user) {
+      if (!password || !name) {
+        return res.status(400).json({ message: 'Name and password are required for new cafe registration' });
+      }
+      const hashed = await bcrypt.hash(password, 10);
+      user = await User.create({ name, email: normalizedEmail, phone: normalizedPhone, password: hashed, role: 'admin' });
     }
 
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email: normalizedEmail, phone: normalizedPhone, password: hashed, role: 'admin' });
-
-    // create organization + branch for this cafe
-    const org = await Organization.create({ name: cafeName || `${name}'s Cafe` });
+    // create organization + branch for this cafe and attach user as admin
+    const org = await Organization.create({ name: cafeName || `${name || user.name}'s Cafe` });
     const branch = await Branch.create({
       name: branchName || 'Main Branch',
       code: `${(branchName || cafeName || 'main').toLowerCase().replace(/\\s+/g, '-')}-${Date.now().toString(36)}`,
       orgId: org._id
     });
-    await UserBranchRole.create({ userId: user._id, branchId: branch._id, orgId: org._id, role: 'admin' });
+    await UserBranchRole.findOneAndUpdate(
+      { userId: user._id, branchId: branch._id },
+      { userId: user._id, branchId: branch._id, orgId: org._id, role: 'admin' },
+      { upsert: true, new: true }
+    );
+
+    // refresh memberships list
+    const memberships = await UserBranchRole.find({ userId: user._id, active: true }).populate('branchId', 'name code');
+    const branches = memberships.map((m) => ({
+      branchId: m.branchId?._id || m.branchId,
+      branchName: m.branchId?.name,
+      code: m.branchId?.code,
+      role: m.role,
+      permissions: m.permissions
+    }));
 
     const token = createToken(user);
     return res.status(201).json({
       token,
-      user: { id: user._id, name, email, phone, role: user.role },
-      branches: [{ branchId: branch._id, branchName: branch.name, code: branch.code, role: 'admin' }]
+      user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+      branches
     });
   } catch (error) {
     if (error.code === 11000) {

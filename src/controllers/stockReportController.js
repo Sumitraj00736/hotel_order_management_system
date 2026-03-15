@@ -15,6 +15,7 @@ const stockReport = async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 200, 500);
 
     const baseMatch = { createdAt: { $gte: from, $lte: to } };
+    if (req.branchId) baseMatch.branchId = req.branchId;
 
     const grouped = await StockTransaction.aggregate([
       { $match: { ...baseMatch } },
@@ -61,7 +62,7 @@ const stockReport = async (req, res) => {
       .sort((a, b) => (b.totalConsumed || 0) - (a.totalConsumed || 0))
       .slice(0, top);
 
-    const lowStock = await Ingredient.find({ $expr: { $lte: ['$currentStock', '$reorderLevel'] } })
+    const lowStock = await Ingredient.find({ $expr: { $lte: ['$currentStock', '$reorderLevel'] }, ...(req.branchId ? { branchId: req.branchId } : {}) })
       .select('name unit currentStock reorderLevel')
       .limit(200)
       .lean();

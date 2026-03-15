@@ -12,8 +12,7 @@ const branchScope = async (req, res, next) => {
 
   // If no memberships recorded, allow legacy single-tenant behavior
   if (!memberships.length) {
-    req.branchId = requestedBranchId || null;
-    return next();
+    return res.status(403).json({ message: 'No branch memberships. Contact admin.' });
   }
 
   // Choose branch: header > single membership > error
@@ -26,8 +25,10 @@ const branchScope = async (req, res, next) => {
   } else if (memberships.length === 1) {
     active = memberships[0];
   } else {
-    // fallback to first membership to avoid blocking legacy clients
-    [active] = memberships;
+    return res.status(400).json({
+      message: 'Select a branch',
+      branches: memberships.map((m) => ({ branchId: m.branchId, role: m.role }))
+    });
   }
 
   req.branchId = active.branchId;

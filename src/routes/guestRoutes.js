@@ -2,6 +2,7 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 const validate = require('../middleware/validate');
+const guestBranch = require('../middleware/guestBranch');
 const MenuItem = require('../models/MenuItem');
 const { createGuestOrder, guestStatus } = require('../controllers/guestOrderController');
 
@@ -14,16 +15,17 @@ const guestLimiter = rateLimit({
   legacyHeaders: false
 });
 
-router.get('/menu', async (req, res) => {
-  const items = await MenuItem.find({ isAvailable: true }).sort({ name: 1 });
+router.get('/menu', guestBranch, async (req, res) => {
+  const items = await MenuItem.find({ isAvailable: true, ...(req.branchId ? { branchId: req.branchId } : {}) }).sort({ name: 1 });
   res.json(items);
 });
 
-router.get('/tables/:tableId/status', [param('tableId').isMongoId()], validate, guestStatus);
+router.get('/tables/:tableId/status', guestBranch, [param('tableId').isMongoId()], validate, guestStatus);
 
 router.post(
   '/orders',
   guestLimiter,
+  guestBranch,
   [
     body('table').isMongoId(),
     body('items').isArray({ min: 1 }),
