@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Branch = require('../models/Branch');
 const Organization = require('../models/Organization');
 const UserBranchRole = require('../models/UserBranchRole');
+const { slugify } = require('../utils/slugify');
 
 const createToken = (user) => {
   if (!process.env.JWT_SECRET) {
@@ -35,10 +36,19 @@ const register = async (req, res) => {
     }
 
     // create organization + branch for this cafe and attach user as admin
-    const org = await Organization.create({ name: cafeName || `${name || user.name}'s Cafe` });
+    const orgName = cafeName || `${name || user.name}'s Cafe`;
+    const baseSlug = slugify(orgName) || 'cafe';
+    let orgSlug = baseSlug;
+    let suffix = 1;
+    // Ensure unique slug for public URL
+    while (await Organization.findOne({ slug: orgSlug })) {
+      orgSlug = `${baseSlug}-${suffix}`;
+      suffix += 1;
+    }
+    const org = await Organization.create({ name: orgName, slug: orgSlug });
     const branch = await Branch.create({
-      name: branchName || 'Main Branch',
-      code: `${(branchName || cafeName || 'main').toLowerCase().replace(/\\s+/g, '-')}-${Date.now().toString(36)}`,
+      name: branchName || orgName,
+      code: `${(branchName || orgName || 'main').toLowerCase().replace(/\\s+/g, '-')}-${Date.now().toString(36)}`,
       orgId: org._id
     });
     await UserBranchRole.findOneAndUpdate(
@@ -48,11 +58,15 @@ const register = async (req, res) => {
     );
 
     // refresh memberships list
-    const memberships = await UserBranchRole.find({ userId: user._id, active: true }).populate('branchId', 'name code');
+    const memberships = await UserBranchRole.find({ userId: user._id, active: true })
+      .populate('branchId', 'name code')
+      .populate('orgId', 'name slug');
     const branches = memberships.map((m) => ({
       branchId: m.branchId?._id || m.branchId,
       branchName: m.branchId?.name,
       code: m.branchId?.code,
+      orgName: m.orgId?.name,
+      orgSlug: m.orgId?.slug,
       role: m.role,
       permissions: m.permissions
     }));
@@ -86,11 +100,15 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const memberships = await UserBranchRole.find({ userId: user._id, active: true }).populate('branchId', 'name code');
+    const memberships = await UserBranchRole.find({ userId: user._id, active: true })
+      .populate('branchId', 'name code')
+      .populate('orgId', 'name slug');
     const branches = memberships.map((m) => ({
       branchId: m.branchId?._id || m.branchId,
       branchName: m.branchId?.name,
       code: m.branchId?.code,
+      orgName: m.orgId?.name,
+      orgSlug: m.orgId?.slug,
       role: m.role,
       permissions: m.permissions
     }));

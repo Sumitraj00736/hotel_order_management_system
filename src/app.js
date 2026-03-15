@@ -21,6 +21,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const subMenuRoutes = require('./routes/subMenuRoutes');
 const addOnRoutes = require('./routes/addOnRoutes');
 const comboRoutes = require('./routes/comboRoutes');
+const publicRoutes = require('./routes/publicRoutes');
 
 const app = express();
 
@@ -96,6 +97,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/submenus', subMenuRoutes);
 app.use('/api/addons', addOnRoutes);
 app.use('/api/combos', comboRoutes);
+app.use('/api/public', publicRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Not Found' });
