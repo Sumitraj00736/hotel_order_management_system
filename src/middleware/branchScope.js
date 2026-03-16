@@ -1,4 +1,5 @@
 const UserBranchRole = require('../models/UserBranchRole');
+const Branch = require('../models/Branch');
 
 // Attaches branchId and branchRole to req based on header x-branch-id and user membership
 const branchScope = async (req, res, next) => {
@@ -12,7 +13,22 @@ const branchScope = async (req, res, next) => {
 
   // If no memberships recorded, allow legacy single-tenant behavior
   if (!memberships.length) {
-    return res.status(403).json({ message: 'No branch memberships. Contact admin.' });
+    const fallbackBranch = await Branch.findOne();
+    if (!fallbackBranch) {
+      return res.status(403).json({ message: 'No branch memberships. Contact admin.' });
+    }
+    await UserBranchRole.findOneAndUpdate(
+      { userId: req.user._id, branchId: fallbackBranch._id },
+      {
+        userId: req.user._id,
+        branchId: fallbackBranch._id,
+        orgId: fallbackBranch.orgId,
+        role: req.user.role,
+        active: true
+      },
+      { upsert: true, new: true }
+    );
+    memberships = await UserBranchRole.find({ userId: req.user._id, active: true });
   }
 
   // Choose branch: header > single membership > error

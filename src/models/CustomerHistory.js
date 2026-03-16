@@ -16,7 +16,12 @@ const customerHistorySchema = new mongoose.Schema(
     tableNumber: { type: Number, required: true },
     items: { type: [historyItemSchema], required: true },
     totalAmount: { type: Number, required: true },
-    paymentMethod: { type: String, enum: ['cash', 'fonepay'], required: true },
+    finalAmount: { type: Number },
+    discountAmount: { type: Number },
+    taxAmount: { type: Number },
+    invoiceNo: { type: String },
+    paymentMode: { type: String },
+    paymentMethod: { type: String, enum: ['cash', 'fonepay', 'card', 'bank'], required: true },
     paidAt: { type: Date, required: true },
     waiter: {
       id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

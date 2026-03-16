@@ -3,6 +3,7 @@ const Table = require('../models/Table');
 const CustomerHistory = require('../models/CustomerHistory');
 const { emitOrderUpdate, emitTableUpdate } = require('../utils/socket');
 const { notifyRole, notifyUser } = require('../utils/notify');
+const { nextSequence } = require('../utils/counter');
 
 const generateBill = async (req, res) => {
   const order = await Order.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })
@@ -29,7 +30,20 @@ const generateBill = async (req, res) => {
       price: item.priceAtOrderTime,
       lineTotal: item.quantity * item.priceAtOrderTime
     })),
+    subTotal: order.subTotal ?? order.totalAmount,
+    discountType: order.discountType,
+    discountValue: order.discountValue,
+    discountAmount: order.discountAmount,
+    taxRate: order.taxRate,
+    taxAmount: order.taxAmount,
+    tipsAmount: order.tipsAmount,
+    roundOff: order.roundOff,
+    taxableAmount: order.taxableAmount ?? order.totalAmount,
+    finalAmount: order.finalAmount ?? order.totalAmount,
     totalAmount: order.totalAmount,
+    invoiceNo: order.invoiceNo,
+    kotNo: order.kotNo,
+    paymentStatus: order.paymentStatus,
     status: order.status,
     createdAt: order.createdAt,
     waiter: order.createdBy?.name,
@@ -43,8 +57,18 @@ const generateBill = async (req, res) => {
 
 const payBill = async (req, res) => {
   try {
-    const { paymentMethod } = req.body;
-    if (!['cash', 'fonepay'].includes(paymentMethod)) {
+    const {
+      paymentMethod,
+      paymentStatus = 'paid',
+      discountType = 'amount',
+      discountValue = 0,
+      taxRate = 0,
+      tipsAmount = 0,
+      roundOff = 0,
+      tenderAmount = 0,
+      customerName
+    } = req.body;
+    if (!['cash', 'fonepay', 'card', 'bank'].includes(paymentMethod)) {
       return res.status(400).json({ message: 'Invalid payment method' });
     }
 
@@ -67,11 +91,37 @@ const payBill = async (req, res) => {
       return res.status(400).json({ message: 'Order already paid' });
     }
 
-    order.status = 'paid';
+    const subTotal = order.subTotal ?? order.totalAmount;
+    const discountAmt =
+      discountType === 'percent'
+        ? (subTotal * Number(discountValue || 0)) / 100
+        : Number(discountValue || 0);
+    const taxableAmount = Math.max(0, subTotal - discountAmt);
+    const taxAmount = (taxableAmount * Number(taxRate || 0)) / 100;
+    const finalAmount = Math.max(0, taxableAmount + taxAmount + Number(tipsAmount || 0) + Number(roundOff || 0));
+    const changeDue = Math.max(0, Number(tenderAmount || 0) - finalAmount);
+
+    const invoiceSeq = await nextSequence(`invoice:${req.branchId}`);
+    order.invoiceNo = order.invoiceNo || `INV-${invoiceSeq}`;
+    order.status = paymentStatus === 'paid' ? 'paid' : order.status;
+    order.paymentStatus = paymentStatus;
     order.paymentMethod = paymentMethod;
     order.paymentRemark = `paid by ${paymentMethod}`;
     order.paidAt = new Date();
     order.paidBy = req.user._id;
+    order.subTotal = subTotal;
+    order.discountType = discountType;
+    order.discountValue = Number(discountValue || 0);
+    order.discountAmount = discountAmt;
+    order.taxRate = Number(taxRate || 0);
+    order.taxAmount = taxAmount;
+    order.tipsAmount = Number(tipsAmount || 0);
+    order.roundOff = Number(roundOff || 0);
+    order.taxableAmount = taxableAmount;
+    order.finalAmount = finalAmount;
+    order.tenderAmount = Number(tenderAmount || 0);
+    order.changeDue = changeDue;
+    if (customerName) order.customerName = customerName;
     await order.save();
 
     const updatedTable = await Table.findOneAndUpdate(
@@ -95,6 +145,11 @@ const payBill = async (req, res) => {
           priceAtOrderTime: item.priceAtOrderTime
         })),
         totalAmount: order.totalAmount,
+        invoiceNo: order.invoiceNo,
+        paymentMode: paymentMethod,
+        finalAmount,
+        discountAmount: discountAmt,
+        taxAmount,
         paymentMethod,
         paidAt: order.paidAt,
         waiter: {

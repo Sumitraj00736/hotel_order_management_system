@@ -4,15 +4,14 @@ const UserBranchRole = require('../models/UserBranchRole');
 const Branch = require('../models/Branch');
 
 const listUsers = async (req, res) => {
-  if (req.branchId) {
-    const memberships = await UserBranchRole.find({ branchId: req.branchId, active: true }).populate('userId');
-    const users = memberships.map((m) => {
-      const u = m.userId;
-      return u ? { id: u._id, name: u.name, email: u.email, phone: u.phone, role: m.role } : null;
-    }).filter(Boolean);
-    return res.json(users);
+  if (!req.branchId) {
+    return res.status(400).json({ message: 'Branch required' });
   }
-  const users = await User.find().select('-password');
+  const memberships = await UserBranchRole.find({ branchId: req.branchId, active: true }).populate('userId');
+  const users = memberships.map((m) => {
+    const u = m.userId;
+    return u ? { id: u._id, name: u.name, email: u.email, phone: u.phone, role: m.role } : null;
+  }).filter(Boolean);
   return res.json(users);
 };
 

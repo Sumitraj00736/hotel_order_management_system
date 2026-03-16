@@ -6,6 +6,7 @@ const Recipe = require('../models/Recipe');
 const StockTransaction = require('../models/StockTransaction');
 const { emitNewOrder, emitOrderUpdate, emitTableUpdate } = require('../utils/socket');
 const { notifyRole, notifyUser } = require('../utils/notify');
+const { nextSequence } = require('../utils/counter');
 
 const buildOrderItems = async (items, branchId) => {
   const menuIds = items.map((item) => item.menuItem);
@@ -201,17 +202,25 @@ const createOrder = async (req, res) => {
 
     const { orderItems, totalAmount } = await buildOrderItems(items, req.branchId);
     await ensureInventoryAvailability(orderItems);
+    const kotSeq = await nextSequence(`kot:${req.branchId}`);
     const [order] = await Order.create(
       [
         {
           table,
           items: orderItems,
           totalAmount,
+          subTotal: totalAmount,
+          taxableAmount: totalAmount,
+          finalAmount: totalAmount,
+          paymentStatus: 'unpaid',
+          kotNo: `KOT-${kotSeq}`,
+          orderType: req.body.orderType || (req.body.source === 'guest' ? 'online' : 'dine_in'),
           status: 'pending',
           branchId: req.branchId,
           createdBy: req.user._id,
           spiceLevel: spiceLevel || 'medium',
-          specialInstructions
+          specialInstructions,
+          customerName: req.body.customerName
         }
       ],
       { session }

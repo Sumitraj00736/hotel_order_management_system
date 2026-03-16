@@ -58,9 +58,24 @@ const register = async (req, res) => {
     );
 
     // refresh memberships list
-    const memberships = await UserBranchRole.find({ userId: user._id, active: true })
+    let memberships = await UserBranchRole.find({ userId: user._id, active: true })
       .populate('branchId', 'name code')
       .populate('orgId', 'name slug');
+    if (!memberships.length) {
+      const fallbackBranch = await Branch.findOne();
+      if (!fallbackBranch) {
+        return res.status(403).json({ message: 'No branch assigned. Contact admin.' });
+      }
+      await UserBranchRole.create({
+        userId: user._id,
+        branchId: fallbackBranch._id,
+        orgId: fallbackBranch.orgId,
+        role: user.role
+      });
+      memberships = await UserBranchRole.find({ userId: user._id, active: true })
+        .populate('branchId', 'name code')
+        .populate('orgId', 'name slug');
+    }
     const branches = memberships.map((m) => ({
       branchId: m.branchId?._id || m.branchId,
       branchName: m.branchId?.name,
