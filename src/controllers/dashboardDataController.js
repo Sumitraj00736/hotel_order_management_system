@@ -20,16 +20,19 @@ const buildRangeMatch = (field, dateFrom, dateTo) => {
   return { [field]: range };
 };
 
-const mapTransactionRows = async ({ branchId, dateFrom, dateTo, limit = 50 }) => {
+const mapTransactionRows = async ({ branchId, dateFrom, dateTo, limit = 50, page = 1 }) => {
   const branchMatch = branchId ? { branchId } : {};
   const salesMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
   const purchaseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
   const expenseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
 
-  const [sales, purchases, expenses] = await Promise.all([
+  const [sales, purchases, expenses, salesCount, purchaseCount, expenseCount] = await Promise.all([
     CustomerHistory.find(salesMatch).sort({ paidAt: -1 }).limit(limit).lean(),
     Purchase.find(purchaseMatch).sort({ paidAt: -1 }).limit(limit).lean(),
-    Expense.find(expenseMatch).sort({ paidAt: -1 }).limit(limit).lean()
+    Expense.find(expenseMatch).sort({ paidAt: -1 }).limit(limit).lean(),
+    CustomerHistory.countDocuments(salesMatch),
+    Purchase.countDocuments(purchaseMatch),
+    Expense.countDocuments(expenseMatch)
   ]);
 
   const userIds = [
@@ -79,14 +82,45 @@ const mapTransactionRows = async ({ branchId, dateFrom, dateTo, limit = 50 }) =>
   }));
 
   const combined = [...salesRows, ...purchaseRows, ...expenseRows].sort((a, b) => new Date(b.txnDate) - new Date(a.txnDate));
-  return combined.slice(0, limit);
+  const start = (page - 1) * limit;
+  const paged = combined.slice(start, start + limit);
+  return {
+    data: paged,
+    total: salesCount + purchaseCount + expenseCount,
+    page,
+    limit
+  };
 };
 
 const transactionHistory = async (req, res) => {
   try {
     const { dateFrom, dateTo } = buildDateRange(req);
     const limit = Math.min(Number(req.query.limit) || 50, 200);
-    const rows = await mapTransactionRows({ branchId: req.branchId, dateFrom, dateTo, limit });
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const rows = await mapTransactionRows({ branchId: req.branchId, dateFrom, dateTo, limit, page });
+
+    if (req.query.format === 'csv') {
+      const headers = ['Entry Date', 'TXN Date', 'TXN No', 'Particular', 'TXN Type', 'Parties', 'PMT Mode', 'Amount', 'Status', 'Entry By'];
+      const lines = rows.data.map((row) => [
+        row.entryDate ? new Date(row.entryDate).toISOString() : '',
+        row.txnDate ? new Date(row.txnDate).toISOString() : '',
+        row.txnNo,
+        row.particular,
+        row.txnType,
+        row.parties,
+        row.paymentMode,
+        row.amount,
+        row.status,
+        row.entryBy
+      ]);
+      const csv = [headers, ...lines]
+        .map((line) => line.map((val) => `"${String(val ?? '').replace(/\"/g, '""')}"`).join(','))
+        .join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="transaction-history.csv"');
+      return res.send(csv);
+    }
+
     return res.json(rows);
   } catch (error) {
     return res.status(500).json({ message: 'Transaction history failed', error: error.message });
@@ -126,6 +160,21 @@ const orderDashboard = async (req, res) => {
       { $limit: 1 }
     ]);
 
+    const orderSeries = await CustomerHistory.aggregate([
+      { $match: branchMatch },
+      {
+        $group: {
+          _id: { year: { $year: '$paidAt' }, month: { $month: '$paidAt' } },
+          orders: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+    const formattedOrderSeries = orderSeries.map((row) => ({
+      month: `${row._id.month}/${row._id.year}`,
+      orders: row.orders
+    }));
+
     return res.json({
       kpis: {
         sales: totalSales,
@@ -145,7 +194,8 @@ const orderDashboard = async (req, res) => {
         serviceCharge: 0
       },
       topSellingTable: topTableAgg[0] || null,
-      salesBySubmenus: []
+      salesBySubmenus: [],
+      orderSeries: formattedOrderSeries
     });
   } catch (error) {
     return res.status(500).json({ message: 'Order dashboard failed', error: error.message });
@@ -212,6 +262,21 @@ const financeDashboard = async (req, res) => {
     const purchase = purchases[0]?.total || 0;
     const expense = expenses[0]?.total || 0;
 
+    const salesSeries = await CustomerHistory.aggregate([
+      { $match: branchMatch },
+      {
+        $group: {
+          _id: { year: { $year: '$paidAt' }, month: { $month: '$paidAt' } },
+          sales: { $sum: '$totalAmount' }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+    const formattedSalesSeries = salesSeries.map((row) => ({
+      month: `${row._id.month}/${row._id.year}`,
+      sales: row.sales
+    }));
+
     return res.json({
       kpis: {
         sales: totalSales,
@@ -220,7 +285,8 @@ const financeDashboard = async (req, res) => {
         expenses: expense,
         paymentIn: totalSales,
         paymentOut: purchase + expense
-      }
+      },
+      salesSeries: formattedSalesSeries
     });
   } catch (error) {
     return res.status(500).json({ message: 'Finance dashboard failed', error: error.message });

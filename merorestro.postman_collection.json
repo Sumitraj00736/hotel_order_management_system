@@ -877,7 +877,24 @@
           "name": "Transaction History",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/api/reports/transactions?limit=20",
+            "url": "{{baseUrl}}/api/reports/transactions?limit=20&page=1",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Transaction History CSV",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/transactions?format=csv",
             "header": [
               {
                 "key": "Authorization",
