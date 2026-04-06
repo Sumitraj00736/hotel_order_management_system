@@ -10,4 +10,6 @@ const subMenuSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+subMenuSchema.index({ branchId: 1, name: 1 });
+
 module.exports = mongoose.model('SubMenu', subMenuSchema);

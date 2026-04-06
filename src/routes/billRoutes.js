@@ -14,7 +14,7 @@ router.get('/:id', generateBill);
 router.post(
   '/:id/pay',
   requireRole('admin'),
-  [body('paymentMethod').isIn(['cash', 'fonepay'])],
+  [body('paymentMethod').isIn(['cash', 'fonepay', 'card', 'bank'])],
   validate,
   payBill
 );

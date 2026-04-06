@@ -1,4 +1,5 @@
 const MenuItem = require('../models/MenuItem');
+const { getCache, setCache, clearCachePrefix } = require('../utils/cache');
 
 const listMenu = async (req, res) => {
   const { search, category, available } = req.query;
@@ -8,7 +9,14 @@ const listMenu = async (req, res) => {
   if (available !== undefined) filter.isAvailable = available === 'true';
   if (search) filter.name = { $regex: search, $options: 'i' };
 
+  const cacheKey = `menus:${req.branchId || 'all'}:${category || 'all'}:${available ?? 'all'}:${search || ''}`;
+  const cached = getCache(cacheKey);
+  if (cached) {
+    return res.json(cached);
+  }
+
   const items = await MenuItem.find(filter).sort({ name: 1 });
+  setCache(cacheKey, items, 10 * 60 * 1000);
   return res.json(items);
 };
 
@@ -23,6 +31,7 @@ const getMenuItem = async (req, res) => {
 const createMenuItem = async (req, res) => {
   try {
     const item = await MenuItem.create({ ...req.body, branchId: req.branchId });
+    clearCachePrefix(`menus:${req.branchId || 'all'}:`);
     return res.status(201).json(item);
   } catch (error) {
     return res.status(500).json({ message: 'Create menu item failed', error: error.message });
@@ -39,6 +48,7 @@ const updateMenuItem = async (req, res) => {
     if (!item) {
       return res.status(404).json({ message: 'Menu item not found' });
     }
+    clearCachePrefix(`menus:${req.branchId || 'all'}:`);
     return res.json(item);
   } catch (error) {
     return res.status(500).json({ message: 'Update menu item failed', error: error.message });
@@ -50,6 +60,7 @@ const deleteMenuItem = async (req, res) => {
   if (!item) {
     return res.status(404).json({ message: 'Menu item not found' });
   }
+  clearCachePrefix(`menus:${req.branchId || 'all'}:`);
   return res.json({ message: 'Menu item deleted' });
 };
 

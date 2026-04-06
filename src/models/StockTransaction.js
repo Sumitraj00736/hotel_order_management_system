@@ -13,4 +13,7 @@ const stockTransactionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+stockTransactionSchema.index({ branchId: 1, createdAt: -1 });
+stockTransactionSchema.index({ ingredient: 1, createdAt: -1 });
+
 module.exports = mongoose.model('StockTransaction', stockTransactionSchema);

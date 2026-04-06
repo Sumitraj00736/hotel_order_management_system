@@ -1,17 +1,22 @@
 const CustomerHistory = require('../models/CustomerHistory');
 
-const listHistory = async (req, res) => {
+const fetchHistory = async ({ branchId, tableNumber, paymentMethod, limit = 200 }) => {
   const filter = {};
-  if (req.branchId) filter.branchId = req.branchId;
-  if (req.query.tableNumber) {
-    filter.tableNumber = Number(req.query.tableNumber);
-  }
-  if (req.query.paymentMethod) {
-    filter.paymentMethod = req.query.paymentMethod;
-  }
+  if (branchId) filter.branchId = branchId;
+  if (tableNumber) filter.tableNumber = Number(tableNumber);
+  if (paymentMethod) filter.paymentMethod = paymentMethod;
 
-  const history = await CustomerHistory.find(filter).sort({ paidAt: -1 });
+  return CustomerHistory.find(filter).sort({ paidAt: -1 }).limit(limit);
+};
+
+const listHistory = async (req, res) => {
+  const history = await fetchHistory({
+    branchId: req.branchId,
+    tableNumber: req.query.tableNumber,
+    paymentMethod: req.query.paymentMethod,
+    limit: Number(req.query.limit) || 200
+  });
   return res.json(history);
 };
 
-module.exports = { listHistory };
+module.exports = { listHistory, fetchHistory };

@@ -4,6 +4,7 @@ const Table = require('../models/Table');
 const Ingredient = require('../models/Ingredient');
 const Recipe = require('../models/Recipe');
 const StockTransaction = require('../models/StockTransaction');
+const UserBranchRole = require('../models/UserBranchRole');
 const { emitNewOrder, emitOrderUpdate, emitTableUpdate } = require('../utils/socket');
 const { notifyRole, notifyUser } = require('../utils/notify');
 const { nextSequence } = require('../utils/counter');
@@ -20,14 +21,30 @@ const buildOrderItems = async (items, branchId) => {
   const menuMap = new Map(menuItems.map((item) => [item._id.toString(), item]));
   const orderItems = items.map((item) => {
     const menu = menuMap.get(item.menuItem);
+    let variant = null;
+    if (item.variantId && menu?.variants?.length) {
+      variant = menu.variants.find((v) => v._id.toString() === item.variantId.toString());
+      if (!variant) {
+        throw new Error('Selected variant not found');
+      }
+    }
+    const price = variant ? variant.price : menu.price;
     return {
       menuItem: menu._id,
       quantity: item.quantity,
-      priceAtOrderTime: menu.price
+      priceAtOrderTime: price,
+      isComplimentary: Boolean(item.isComplimentary),
+      variantId: variant?._id,
+      variantName: variant?.name,
+      variantPrice: variant?.price,
+      itemNote: item.itemNote
     };
   });
 
-  const totalAmount = orderItems.reduce((sum, item) => sum + item.quantity * item.priceAtOrderTime, 0);
+  const totalAmount = orderItems.reduce(
+    (sum, item) => sum + (item.isComplimentary ? 0 : item.quantity * item.priceAtOrderTime),
+    0
+  );
   return { orderItems, totalAmount };
 };
 
@@ -146,18 +163,40 @@ const listOrders = async (req, res) => {
   if (req.query.status) {
     filter.status = req.query.status;
   }
+  if (req.query.dateFrom || req.query.dateTo) {
+    filter.createdAt = {};
+    if (req.query.dateFrom) filter.createdAt.$gte = new Date(req.query.dateFrom);
+    if (req.query.dateTo) filter.createdAt.$lte = new Date(req.query.dateTo);
+  }
 
   if (req.user.role === 'waiter') {
     filter.$or = [{ createdBy: req.user._id }, { source: 'guest' }];
   }
 
-  const orders = await Order.find(filter)
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 0, 0), 500);
+  const paginate = req.query.paginate === '1' || Number.isFinite(Number(req.query.page)) || Number.isFinite(Number(req.query.limit));
+  const skip = paginate && limit > 0 ? (page - 1) * limit : 0;
+
+  const query = Order.find(filter)
     .populate('table')
     .populate('items.menuItem')
     .populate('createdBy', 'name email role')
     .populate('kitchenAssigned', 'name email role')
+    .populate('assignedStaff', 'name email role')
     .populate('paidBy', 'name email role')
     .sort({ createdAt: -1 });
+
+  if (paginate && limit > 0) {
+    query.skip(skip).limit(limit);
+  }
+
+  const orders = await query;
+
+  if (paginate && limit > 0) {
+    const total = await Order.countDocuments(filter);
+    return res.json({ data: orders, page, limit, total });
+  }
 
   return res.json(orders);
 };
@@ -168,6 +207,7 @@ const getOrder = async (req, res) => {
     .populate('items.menuItem')
     .populate('createdBy', 'name email role')
     .populate('kitchenAssigned', 'name email role')
+    .populate('assignedStaff', 'name email role')
     .populate('paidBy', 'name email role');
 
   if (!order) {
@@ -240,6 +280,7 @@ const createOrder = async (req, res) => {
       .populate('items.menuItem')
       .populate('createdBy', 'name email role')
       .populate('kitchenAssigned', 'name email role')
+      .populate('assignedStaff', 'name email role')
       .populate('paidBy', 'name email role');
 
     emitNewOrder(populated);
@@ -332,13 +373,90 @@ const updateOrder = async (req, res) => {
     if (req.body.items) {
       const existingItems = order.items.map((i) => ({
         menuItem: i.menuItem.toString(),
-        quantity: i.quantity
+        quantity: i.quantity,
+        priceAtOrderTime: i.priceAtOrderTime
       }));
-      const { orderItems, totalAmount } = await buildOrderItems(req.body.items);
+
+      const requestedItems = req.body.items.map((i) => ({
+        menuItem: i.menuItem.toString(),
+        quantity: i.quantity,
+        isComplimentary: Boolean(i.isComplimentary),
+        variantId: i.variantId,
+        itemNote: i.itemNote
+      }));
+
+      const existingMap = new Map(existingItems.map((i) => [i.menuItem, i]));
+      const newIds = requestedItems.filter((i) => !existingMap.has(i.menuItem)).map((i) => i.menuItem);
+
+      let menuMap = new Map();
+      const allIds = Array.from(new Set(requestedItems.map((i) => i.menuItem)));
+      const allMenus = await MenuItem.find({ _id: { $in: allIds }, ...(req.branchId ? { branchId: req.branchId } : {}) });
+      const allMenuMap = new Map(allMenus.map((m) => [m._id.toString(), m]));
+      if (newIds.length > 0) {
+        const filter = { _id: { $in: newIds }, isAvailable: true };
+        if (req.branchId) filter.branchId = req.branchId;
+        const menuItems = await MenuItem.find(filter);
+        if (menuItems.length !== newIds.length) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ message: 'Update order failed', error: 'One or more menu items are unavailable' });
+        }
+        menuMap = new Map(menuItems.map((item) => [item._id.toString(), item]));
+      }
+
+      const orderItems = requestedItems.map((item) => {
+        const existing = existingMap.get(item.menuItem);
+        const menuDoc = allMenuMap.get(item.menuItem);
+        let variant = null;
+        if (item.variantId) {
+          if (menuDoc?.variants?.length) {
+            variant = menuDoc.variants.find((v) => v._id.toString() === item.variantId.toString());
+          }
+          if (!variant && existing?.variantId?.toString() !== item.variantId.toString()) {
+            throw new Error('Selected variant not found');
+          }
+        }
+        const priceAtOrderTime = existing
+          ? existing.priceAtOrderTime
+          : variant?.price ?? menuMap.get(item.menuItem)?.price;
+        return {
+          menuItem: item.menuItem,
+          quantity: item.quantity,
+          priceAtOrderTime,
+          isComplimentary: item.isComplimentary ?? existing?.isComplimentary ?? false,
+          variantId: variant?._id || existing?.variantId,
+          variantName: variant?.name || existing?.variantName,
+          variantPrice: variant?.price || existing?.variantPrice,
+          itemNote: item.itemNote ?? existing?.itemNote
+        };
+      });
+
+      const totalAmount = orderItems.reduce(
+        (sum, item) => sum + (item.isComplimentary ? 0 : item.quantity * (item.priceAtOrderTime || 0)),
+        0
+      );
+
       await applyInventoryDelta(existingItems, orderItems, order._id, req.user?._id, session);
       order.items = orderItems;
       order.totalAmount = totalAmount;
       changes.push('items updated');
+    }
+
+    if (req.body.assignedStaff !== undefined) {
+      if (!req.body.assignedStaff) {
+        order.assignedStaff = null;
+      } else {
+        const match = { userId: req.body.assignedStaff };
+        if (req.branchId) match.branchId = req.branchId;
+        const allowed = await UserBranchRole.findOne(match);
+        if (!allowed) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(400).json({ message: 'Invalid staff selection' });
+        }
+        order.assignedStaff = req.body.assignedStaff;
+      }
+      changes.push('assigned staff updated');
     }
 
     if (req.body.spiceLevel) {
@@ -349,6 +467,11 @@ const updateOrder = async (req, res) => {
     if (req.body.specialInstructions !== undefined) {
       order.specialInstructions = req.body.specialInstructions;
       changes.push('instructions updated');
+    }
+
+    if (req.body.customerName !== undefined) {
+      order.customerName = req.body.customerName;
+      changes.push('customer updated');
     }
 
     if (req.body.status && req.user.role !== 'waiter') {
@@ -374,6 +497,7 @@ const updateOrder = async (req, res) => {
       .populate('items.menuItem')
       .populate('createdBy', 'name email role')
       .populate('kitchenAssigned', 'name email role')
+      .populate('assignedStaff', 'name email role')
       .populate('paidBy', 'name email role');
 
     emitOrderUpdate(populated);
@@ -453,6 +577,7 @@ const updateOrderStatus = async (req, res) => {
       .populate('items.menuItem')
       .populate('createdBy', 'name email role')
       .populate('kitchenAssigned', 'name email role')
+      .populate('assignedStaff', 'name email role')
       .populate('paidBy', 'name email role');
 
     emitOrderUpdate(populated);

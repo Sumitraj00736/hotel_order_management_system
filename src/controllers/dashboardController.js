@@ -1,0 +1,152 @@
+const User = require('../models/User');
+const Table = require('../models/Table');
+const MenuItem = require('../models/MenuItem');
+const Order = require('../models/Order');
+const Category = require('../models/Category');
+const SubMenu = require('../models/SubMenu');
+const AddOn = require('../models/AddOn');
+const ComboOffer = require('../models/ComboOffer');
+const Purchase = require('../models/Purchase');
+const Expense = require('../models/Expense');
+const Notification = require('../models/Notification');
+const { buildSummaryData, buildOverviewData, buildAnalyticsData } = require('./reportController');
+const { buildStockReport } = require('./stockReportController');
+const { fetchHistory } = require('./historyController');
+const { getCache, setCache } = require('../utils/cache');
+
+const getStockRange = (fromQuery, toQuery) => {
+  const now = new Date();
+  const to = toQuery ? new Date(toQuery) : now;
+  const from = fromQuery ? new Date(fromQuery) : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return { from, to };
+};
+
+const dashboardSnapshot = async (req, res) => {
+  try {
+    const branchId = req.branchId;
+    const ordersLimit = Math.min(Math.max(Number(req.query.ordersLimit) || 50, 1), 200);
+    const includeAnalytics = req.query.includeAnalytics !== 'false';
+    const includeStock = req.query.includeStock !== 'false';
+    const includeHistory = req.query.includeHistory !== 'false';
+    const includeNotifications = req.query.includeNotifications !== 'false';
+    const dateFrom = req.query.dateFrom;
+    const dateTo = req.query.dateTo;
+
+    const orderFilter = {};
+    if (branchId) orderFilter.branchId = branchId;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    orderFilter.createdAt = { $gte: dateFrom ? new Date(dateFrom) : todayStart };
+    if (dateTo) orderFilter.createdAt.$lte = new Date(dateTo);
+
+    const ordersQuery = Order.find(orderFilter)
+      .populate('table')
+      .populate('items.menuItem')
+      .populate('createdBy', 'name email role')
+      .populate('kitchenAssigned', 'name email role')
+      .populate('assignedStaff', 'name email role')
+      .populate('paidBy', 'name email role')
+      .sort({ createdAt: -1 })
+      .limit(ordersLimit);
+
+    const summaryPromise = buildSummaryData({ branchId, dateFrom, dateTo });
+    const overviewPromise = buildOverviewData({ branchId });
+
+    const analyticsCacheKey = `analytics:${branchId || 'all'}`;
+    const cachedAnalytics = includeAnalytics ? getCache(analyticsCacheKey) : null;
+    const analyticsPromise = includeAnalytics ? cachedAnalytics || buildAnalyticsData({ branchId }) : Promise.resolve(null);
+
+    const stockPromise = includeStock
+      ? (() => {
+          const { from, to } = getStockRange(req.query.stockFrom, req.query.stockTo);
+          return buildStockReport({ branchId, from, to, top: 10, limit: 200 });
+        })()
+      : Promise.resolve(null);
+
+    const historyPromise = includeHistory
+      ? fetchHistory({ branchId, limit: 100 })
+      : Promise.resolve([]);
+
+    const notificationsPromise = includeNotifications
+      ? Notification.find({ ...(branchId ? { branchId } : {}), role: 'admin' })
+          .sort({ createdAt: -1 })
+          .limit(50)
+      : Promise.resolve([]);
+
+    const menusCacheKey = `menus:${branchId || 'all'}:all:all:`;
+    const cachedMenus = getCache(menusCacheKey);
+
+    const [
+      users,
+      tables,
+      menus,
+      orders,
+      summary,
+      overview,
+      analytics,
+      stock,
+      history,
+      categories,
+      submenus,
+      addons,
+      combos,
+      purchases,
+      expenses,
+      notifications
+    ] = await Promise.all([
+      User.find(branchId ? { branchId } : {}).sort({ createdAt: -1 }),
+      Table.find(branchId ? { branchId } : {}).sort({ tableNumber: 1 }),
+      cachedMenus || MenuItem.find(branchId ? { branchId } : {}).sort({ name: 1 }),
+      ordersQuery,
+      summaryPromise,
+      overviewPromise,
+      analyticsPromise,
+      stockPromise,
+      historyPromise,
+      Category.find(branchId ? { branchId } : {}).sort({ name: 1 }),
+      SubMenu.find(branchId ? { branchId } : {}).sort({ name: 1 }),
+      AddOn.find(branchId ? { branchId } : {}).sort({ name: 1 }),
+      ComboOffer.find(branchId ? { branchId } : {}).sort({ name: 1 }),
+      Purchase.find(branchId ? { branchId } : {}).sort({ paidAt: -1 }).limit(200),
+      Expense.find(branchId ? { branchId } : {}).sort({ paidAt: -1 }).limit(200),
+      notificationsPromise
+    ]);
+
+    if (!cachedMenus && Array.isArray(menus)) {
+      setCache(menusCacheKey, menus, 10 * 60 * 1000);
+    }
+    if (includeAnalytics && !cachedAnalytics) {
+      setCache(analyticsCacheKey, analytics, 60 * 1000);
+    }
+
+    return res.json({
+      users,
+      tables,
+      menus,
+      orders,
+      report: summary,
+      overview,
+      analytics,
+      stockReport: stock,
+      history,
+      categories,
+      submenus,
+      addons,
+      combos,
+      purchases,
+      expenses,
+      notifications,
+      meta: {
+        orders: {
+          limit: ordersLimit,
+          from: orderFilter.createdAt?.$gte || null,
+          to: orderFilter.createdAt?.$lte || null
+        }
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Dashboard snapshot failed', error: error.message });
+  }
+};
+
+module.exports = { dashboardSnapshot };

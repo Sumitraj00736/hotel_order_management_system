@@ -30,4 +30,6 @@ const comboOfferSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+comboOfferSchema.index({ branchId: 1, name: 1 });
+
 module.exports = mongoose.model('ComboOffer', comboOfferSchema);

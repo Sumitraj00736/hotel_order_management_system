@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
+const compression = require('compression');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -22,6 +23,9 @@ const subMenuRoutes = require('./routes/subMenuRoutes');
 const addOnRoutes = require('./routes/addOnRoutes');
 const comboRoutes = require('./routes/comboRoutes');
 const publicRoutes = require('./routes/publicRoutes');
+const purchaseRoutes = require('./routes/purchaseRoutes');
+const expenseRoutes = require('./routes/expenseRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
 
@@ -56,6 +60,7 @@ app.use(
   })
 );
 app.use(helmet());
+app.use(compression());
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -97,6 +102,9 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/submenus', subMenuRoutes);
 app.use('/api/addons', addOnRoutes);
 app.use('/api/combos', comboRoutes);
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/public', publicRoutes);
 
 app.use((req, res) => {
