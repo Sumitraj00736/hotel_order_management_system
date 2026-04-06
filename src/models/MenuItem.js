@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
 
+const variantSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true, required: true },
+    price: { type: Number, required: true, min: 0 }
+  },
+  { _id: true }
+);
+
 const menuItemSchema = new mongoose.Schema(
   {
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
@@ -12,6 +20,7 @@ const menuItemSchema = new mongoose.Schema(
     preparationTimeMinutes: { type: Number, default: 0 },
     price: { type: Number, required: true, min: 0 },
     maxPrice: { type: Number, min: 0 },
+    variants: { type: [variantSchema], default: [] },
     isAvailable: { type: Boolean, default: true },
     imageUrl: { type: String, trim: true },
     description: { type: String },
@@ -19,5 +28,10 @@ const menuItemSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+menuItemSchema.index({ branchId: 1, name: 1 });
+menuItemSchema.index({ branchId: 1, category: 1 });
+menuItemSchema.index({ branchId: 1, subMenu: 1 });
+menuItemSchema.index({ branchId: 1, isAvailable: 1 });
 
 module.exports = mongoose.model('MenuItem', menuItemSchema);

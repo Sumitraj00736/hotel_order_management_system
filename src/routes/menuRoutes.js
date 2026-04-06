@@ -26,7 +26,10 @@ router.post(
     body('maxPrice').optional().isFloat({ min: 0 }),
     body('preparationTimeMinutes').optional().isInt({ min: 0 }),
     body('addOns').optional().isArray(),
-    body('imageUrl').optional().isURL()
+    body('imageUrl').optional().isURL(),
+    body('variants').optional().isArray(),
+    body('variants.*.name').optional().isString(),
+    body('variants.*.price').optional().isFloat({ min: 0 })
   ],
   validate,
   createMenuItem
@@ -44,7 +47,10 @@ router.put(
     body('maxPrice').optional().isFloat({ min: 0 }),
     body('preparationTimeMinutes').optional().isInt({ min: 0 }),
     body('addOns').optional().isArray(),
-    body('imageUrl').optional().isURL()
+    body('imageUrl').optional().isURL(),
+    body('variants').optional().isArray(),
+    body('variants.*.name').optional().isString(),
+    body('variants.*.price').optional().isFloat({ min: 0 })
   ],
   validate,
   updateMenuItem

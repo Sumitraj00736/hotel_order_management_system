@@ -11,4 +11,6 @@ const tableSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+tableSchema.index({ branchId: 1, tableNumber: 1 }, { unique: true, sparse: true });
+
 module.exports = mongoose.model('Table', tableSchema);

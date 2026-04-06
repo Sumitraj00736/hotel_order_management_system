@@ -12,4 +12,6 @@ const addOnSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+addOnSchema.index({ branchId: 1, name: 1 });
+
 module.exports = mongoose.model('AddOn', addOnSchema);

@@ -36,4 +36,9 @@ const customerHistorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+customerHistorySchema.index({ branchId: 1, paidAt: -1 });
+customerHistorySchema.index({ branchId: 1, createdAt: -1 });
+customerHistorySchema.index({ branchId: 1, 'waiter.id': 1, paidAt: -1 });
+customerHistorySchema.index({ branchId: 1, 'kitchen.id': 1, paidAt: -1 });
+
 module.exports = mongoose.model('CustomerHistory', customerHistorySchema);

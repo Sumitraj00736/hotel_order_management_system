@@ -1,31 +1,153 @@
 const Order = require('../models/Order');
 const CustomerHistory = require('../models/CustomerHistory');
 const User = require('../models/User');
+const Purchase = require('../models/Purchase');
+const Expense = require('../models/Expense');
+const { getCache, setCache } = require('../utils/cache');
 
-const summaryReport = async (req, res) => {
+const buildSummaryData = async ({ branchId, dateFrom, dateTo }) => {
   const filter = {};
-  if (req.branchId) filter.branchId = req.branchId;
-  const orders = await Order.find(filter);
-  const totalOrders = orders.length;
-  const totalSales = orders.filter((o) => o.status === 'paid').reduce((sum, o) => sum + o.totalAmount, 0);
-  const byStatus = orders.reduce((acc, order) => {
-    acc[order.status] = (acc[order.status] || 0) + 1;
+  if (branchId) filter.branchId = branchId;
+  const hasDateFilter = Boolean(dateFrom || dateTo);
+
+  const totalOrders = await Order.countDocuments(filter);
+
+  const paidMatch = {
+    ...filter,
+    $or: [{ status: 'paid' }, { paymentStatus: 'paid' }]
+  };
+  if (hasDateFilter) {
+    paidMatch.paidAt = {};
+    if (dateFrom) paidMatch.paidAt.$gte = new Date(dateFrom);
+    if (dateTo) paidMatch.paidAt.$lte = new Date(dateTo);
+  }
+
+  const paidAgg = await Order.aggregate([
+    { $match: paidMatch },
+    {
+      $group: {
+        _id: null,
+        totalSales: { $sum: { $ifNull: ['$finalAmount', '$totalAmount'] } },
+        dineIn: {
+          $sum: {
+            $cond: [{ $eq: ['$orderType', 'dine_in'] }, { $ifNull: ['$finalAmount', '$totalAmount'] }, 0]
+          }
+        },
+        delivery: {
+          $sum: {
+            $cond: [{ $eq: ['$orderType', 'delivery'] }, { $ifNull: ['$finalAmount', '$totalAmount'] }, 0]
+          }
+        },
+        takeaway: {
+          $sum: {
+            $cond: [{ $eq: ['$orderType', 'takeaway'] }, { $ifNull: ['$finalAmount', '$totalAmount'] }, 0]
+          }
+        },
+        reservation: {
+          $sum: {
+            $cond: [{ $eq: ['$orderType', 'online'] }, { $ifNull: ['$finalAmount', '$totalAmount'] }, 0]
+          }
+        }
+      }
+    }
+  ]);
+
+  const unpaidMatch = {
+    ...filter,
+    status: { $ne: 'paid' },
+    paymentStatus: { $ne: 'paid' }
+  };
+  if (hasDateFilter) {
+    unpaidMatch.createdAt = {};
+    if (dateFrom) unpaidMatch.createdAt.$gte = new Date(dateFrom);
+    if (dateTo) unpaidMatch.createdAt.$lte = new Date(dateTo);
+  }
+  const unpaidAgg = await Order.aggregate([
+    { $match: unpaidMatch },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$finalAmount', '$totalAmount'] } } } }
+  ]);
+
+  const statusMatch = branchId ? { branchId } : {};
+  const byStatusAgg = await Order.aggregate([
+    { $match: statusMatch },
+    { $group: { _id: '$status', count: { $sum: 1 } } }
+  ]);
+  const byStatus = byStatusAgg.reduce((acc, row) => {
+    acc[row._id] = row.count;
     return acc;
   }, {});
 
-  return res.json({ totalOrders, totalSales, byStatus });
+  const totalSales = paidAgg[0]?.totalSales || 0;
+  const unpaidTotal = unpaidAgg[0]?.total || 0;
+  const typeTotals = {
+    dineIn: paidAgg[0]?.dineIn || 0,
+    delivery: paidAgg[0]?.delivery || 0,
+    takeaway: paidAgg[0]?.takeaway || 0,
+    reservation: paidAgg[0]?.reservation || 0
+  };
+
+  const purchaseMatch = branchId ? { branchId } : {};
+  const expenseMatch = branchId ? { branchId } : {};
+  if (hasDateFilter) {
+    const range = {};
+    if (dateFrom) range.$gte = new Date(dateFrom);
+    if (dateTo) range.$lte = new Date(dateTo);
+    purchaseMatch.paidAt = range;
+    expenseMatch.paidAt = range;
+  }
+
+  const purchaseAgg = await Purchase.aggregate([
+    { $match: purchaseMatch },
+    { $group: { _id: null, total: { $sum: '$amount' } } }
+  ]);
+  const expenseAgg = await Expense.aggregate([
+    { $match: expenseMatch },
+    { $group: { _id: null, total: { $sum: '$amount' } } }
+  ]);
+
+  const purchase = purchaseAgg[0]?.total || 0;
+  const expenses = expenseAgg[0]?.total || 0;
+  const paymentIn = totalSales;
+  const paymentOut = purchase + expenses;
+  const income = paymentIn; // keep aligned with sales unless other income sources are added
+
+  return {
+    totalOrders,
+    totalSales,
+    byStatus,
+    paid: totalSales,
+    unpaid: unpaidTotal,
+    dineIn: typeTotals.dineIn,
+    delivery: typeTotals.delivery,
+    takeaway: typeTotals.takeaway,
+    reservation: typeTotals.reservation,
+    purchase,
+    income,
+    expenses,
+    paymentIn,
+    paymentOut
+  };
 };
 
-const overviewReport = async (req, res) => {
+const summaryReport = async (req, res) => {
+  const data = await buildSummaryData({
+    branchId: req.branchId,
+    dateFrom: req.query.dateFrom,
+    dateTo: req.query.dateTo
+  });
+  return res.json(data);
+};
+
+const buildOverviewData = async ({ branchId }) => {
   const filter = { status: { $in: ['pending', 'preparing', 'ready', 'served'] } };
-  if (req.branchId) filter.branchId = req.branchId;
+  if (branchId) filter.branchId = branchId;
   const activeOrders = await Order.find(filter)
     .populate('table')
     .populate('createdBy', 'name email')
     .populate('kitchenAssigned', 'name email');
 
-  const unpaidOrders = await Order.countDocuments({ status: { $ne: 'paid' }, ...(req.branchId ? { branchId: req.branchId } : {}) });
-  const statusMatch = req.branchId ? { branchId: req.branchId } : {};
+  const unpaidOrders = await Order.countDocuments({ status: { $ne: 'paid' }, ...(branchId ? { branchId } : {}) });
+  const statusMatch = branchId ? { branchId } : {};
   const statusCountsAgg = await Order.aggregate([
     { $match: statusMatch },
     { $group: { _id: '$status', count: { $sum: 1 } } }
@@ -65,7 +187,7 @@ const overviewReport = async (req, res) => {
       ? kitchenLoads.reduce((best, k) => (k.orders > (best?.orders || 0) ? k : best), null)
       : null;
 
-  return res.json({
+  return {
     activeByWaiter: waiterList,
     activeOrders: activeOrders.length,
     unpaidOrders,
@@ -73,7 +195,12 @@ const overviewReport = async (req, res) => {
     kitchenLoads,
     topWaiter,
     topKitchen
-  });
+  };
+};
+
+const overviewReport = async (req, res) => {
+  const data = await buildOverviewData({ branchId: req.branchId });
+  return res.json(data);
 };
 
 const monthsAgo = (months) => {
@@ -214,8 +341,8 @@ const buildPerformance = async (months, groupField, branchMatch) => {
   return resolveNames(rows);
 };
 
-const analyticsReport = async (req, res) => {
-  const match = req.branchId ? { branchId: req.branchId } : {};
+const buildAnalyticsData = async ({ branchId }) => {
+  const match = branchId ? { branchId } : {};
   const totalSalesAgg = await CustomerHistory.aggregate([
     { $match: match },
     { $group: { _id: null, totalSales: { $sum: '$totalAmount' }, totalOrders: { $sum: 1 } } }
@@ -251,11 +378,11 @@ const analyticsReport = async (req, res) => {
     { $sort: { sales: -1 } }
   ]);
 
-  const branchMatch = req.branchId ? { branchId: req.branchId } : {};
+  const branchMatch = branchId ? { branchId } : {};
   const companyMonthly = await buildMonthlySeries({ months: 6, match: branchMatch });
 
-  const waiterList = await User.find({ role: 'waiter' }).select('name');
-  const kitchenList = await User.find({ role: 'kitchen' }).select('name');
+  const waiterList = await User.find({ role: 'waiter', ...(branchId ? { branchId } : {}) }).select('name');
+  const kitchenList = await User.find({ role: 'kitchen', ...(branchId ? { branchId } : {}) }).select('name');
 
   const waiterRanking = await resolveNames(waiterRankingRaw);
   const kitchenRanking = await resolveNames(kitchenRankingRaw);
@@ -304,7 +431,7 @@ const analyticsReport = async (req, res) => {
     last6Months: await buildPerformance(6, 'kitchen', branchMatch)
   };
 
-  return res.json({
+  return {
     salesSummary: { totalSales, totalOrders },
     companyMonthly,
     waiterRanking,
@@ -317,7 +444,18 @@ const analyticsReport = async (req, res) => {
     kitchenList,
     waiterPerformance,
     kitchenPerformance
-  });
+  };
 };
 
-module.exports = { summaryReport, overviewReport, analyticsReport };
+const analyticsReport = async (req, res) => {
+  const cacheKey = `analytics:${req.branchId || 'all'}`;
+  const cached = getCache(cacheKey);
+  if (cached) {
+    return res.json(cached);
+  }
+  const data = await buildAnalyticsData({ branchId: req.branchId });
+  setCache(cacheKey, data, 60 * 1000);
+  return res.json(data);
+};
+
+module.exports = { summaryReport, overviewReport, analyticsReport, buildSummaryData, buildOverviewData, buildAnalyticsData };

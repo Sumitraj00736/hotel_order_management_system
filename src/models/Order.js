@@ -4,7 +4,12 @@ const orderItemSchema = new mongoose.Schema(
   {
     menuItem: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem', required: true },
     quantity: { type: Number, required: true, min: 1 },
-    priceAtOrderTime: { type: Number, required: true, min: 0 }
+    priceAtOrderTime: { type: Number, required: true, min: 0 },
+    isComplimentary: { type: Boolean, default: false },
+    variantId: { type: mongoose.Schema.Types.ObjectId },
+    variantName: { type: String, trim: true },
+    variantPrice: { type: Number, min: 0 },
+    itemNote: { type: String, trim: true }
   },
   { _id: false }
 );
@@ -41,6 +46,7 @@ const orderSchema = new mongoose.Schema(
     specialInstructions: { type: String, trim: true },
     kitchenAssigned: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     kitchenAssignedAt: { type: Date },
+    assignedStaff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     paymentMethod: { type: String, enum: ['cash', 'fonepay', 'card', 'bank'] },
     paymentRemark: { type: String },
     paidAt: { type: Date },
@@ -59,5 +65,12 @@ const orderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+orderSchema.index({ branchId: 1, createdAt: -1 });
+orderSchema.index({ branchId: 1, status: 1, createdAt: -1 });
+orderSchema.index({ branchId: 1, paymentStatus: 1, createdAt: -1 });
+orderSchema.index({ branchId: 1, paidAt: -1 });
+orderSchema.index({ branchId: 1, table: 1, status: 1 });
+orderSchema.index({ branchId: 1, createdBy: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Order', orderSchema);
