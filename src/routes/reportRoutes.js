@@ -1,7 +1,7 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const branchScope = require('../middleware/branchScope');
-const requireRole = require('../middleware/requireRole');
+const requirePermission = require('../middleware/requirePermission');
 const { summaryReport, overviewReport, analyticsReport } = require('../controllers/reportController');
 const {
   transactionHistory,
@@ -14,16 +14,16 @@ const { listHistory } = require('../controllers/historyController');
 
 const router = express.Router();
 
-router.use(auth, branchScope, requireRole('admin'));
+router.use(auth, branchScope);
 
-router.get('/summary', summaryReport);
-router.get('/overview', overviewReport);
-router.get('/analytics', analyticsReport);
-router.get('/history', listHistory);
-router.get('/stock', stockReport);
-router.get('/transactions', transactionHistory);
-router.get('/order-dashboard', orderDashboard);
-router.get('/overview-dashboard', overviewDashboard);
-router.get('/finance-dashboard', financeDashboard);
+router.get('/summary', requirePermission('reports:view'), summaryReport);
+router.get('/overview', requirePermission('reports:view'), overviewReport);
+router.get('/analytics', requirePermission('reports:view'), analyticsReport);
+router.get('/history', requirePermission('reports:view'), listHistory);
+router.get('/stock', requirePermission('reports:view'), stockReport);
+router.get('/transactions', requirePermission('reports:view'), transactionHistory);
+router.get('/order-dashboard', requirePermission('reports:view'), orderDashboard);
+router.get('/overview-dashboard', requirePermission('reports:view'), overviewDashboard);
+router.get('/finance-dashboard', requirePermission('reports:view'), financeDashboard);
 
 module.exports = router;

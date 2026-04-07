@@ -2,7 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const auth = require('../middleware/auth');
 const branchScope = require('../middleware/branchScope');
-const requireRole = require('../middleware/requireRole');
+const requirePermission = require('../middleware/requirePermission');
 const validate = require('../middleware/validate');
 const { listMenu, getMenuItem, createMenuItem, updateMenuItem, deleteMenuItem } = require('../controllers/menuController');
 
@@ -10,12 +10,12 @@ const router = express.Router();
 
 router.use(auth, branchScope);
 
-router.get('/', listMenu);
-router.get('/:id', getMenuItem);
+router.get('/', requirePermission('menu:view'), listMenu);
+router.get('/:id', requirePermission('menu:view'), getMenuItem);
 
 router.post(
   '/',
-  requireRole('admin'),
+  requirePermission('menu:edit'),
   [
     body('name').notEmpty(),
     body('category').optional().isMongoId(),
@@ -36,7 +36,7 @@ router.post(
 );
 router.put(
   '/:id',
-  requireRole('admin'),
+  requirePermission('menu:edit'),
   [
     body('name').optional().notEmpty(),
     body('category').optional().isMongoId(),
@@ -55,6 +55,6 @@ router.put(
   validate,
   updateMenuItem
 );
-router.delete('/:id', requireRole('admin'), deleteMenuItem);
+router.delete('/:id', requirePermission('menu:edit'), deleteMenuItem);
 
 module.exports = router;

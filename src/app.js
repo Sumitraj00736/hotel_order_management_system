@@ -14,6 +14,9 @@ const orderRoutes = require('./routes/orderRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const billRoutes = require('./routes/billRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
+const taxRoutes = require('./routes/taxRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const promotionRoutes = require('./routes/promotionRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
@@ -26,6 +29,10 @@ const publicRoutes = require('./routes/publicRoutes');
 const purchaseRoutes = require('./routes/purchaseRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const roleRoutes = require('./routes/roleRoutes');
+const billingRoutes = require('./routes/billingRoutes');
+const departmentRoutes = require('./routes/departmentRoutes');
+const supportRoutes = require('./routes/supportRoutes');
 
 const app = express();
 
@@ -94,6 +101,9 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/taxes', taxRoutes);
+app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/promotions', promotionRoutes);
 app.use('/api/inventory', inventoryRoutes);
@@ -105,6 +115,10 @@ app.use('/api/combos', comboRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/roles', roleRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/departments', departmentRoutes);
+app.use('/api/support', supportRoutes);
 app.use('/api/public', publicRoutes);
 
 app.use((req, res) => {

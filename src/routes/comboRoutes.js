@@ -2,16 +2,17 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const auth = require('../middleware/auth');
 const branchScope = require('../middleware/branchScope');
-const requireRole = require('../middleware/requireRole');
+const requirePermission = require('../middleware/requirePermission');
 const validate = require('../middleware/validate');
 const { listCombos, createCombo, updateCombo, deleteCombo } = require('../controllers/comboController');
 
 const router = express.Router();
-router.use(auth, branchScope, requireRole('admin'));
+router.use(auth, branchScope);
 
-router.get('/', listCombos);
+router.get('/', requirePermission('menu:view'), listCombos);
 router.post(
   '/',
+  requirePermission('menu:edit'),
   [
     body('name').notEmpty(),
     body('priceActual').isFloat({ min: 0 }),
@@ -24,7 +25,7 @@ router.post(
   validate,
   createCombo
 );
-router.put('/:id', [param('id').isMongoId()], validate, updateCombo);
-router.delete('/:id', [param('id').isMongoId()], validate, deleteCombo);
+router.put('/:id', requirePermission('menu:edit'), [param('id').isMongoId()], validate, updateCombo);
+router.delete('/:id', requirePermission('menu:edit'), [param('id').isMongoId()], validate, deleteCombo);
 
 module.exports = router;

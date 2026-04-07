@@ -2,17 +2,18 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const auth = require('../middleware/auth');
 const branchScope = require('../middleware/branchScope');
-const requireRole = require('../middleware/requireRole');
+const requirePermission = require('../middleware/requirePermission');
 const validate = require('../middleware/validate');
 const { listExpenses, createExpense, updateExpense, deleteExpense } = require('../controllers/expenseController');
 
 const router = express.Router();
 
-router.use(auth, branchScope, requireRole('admin'));
+router.use(auth, branchScope);
 
-router.get('/', listExpenses);
+router.get('/', requirePermission('billing:view'), listExpenses);
 router.post(
   '/',
+  requirePermission('billing:edit'),
   [
     body('title').notEmpty(),
     body('amount').isFloat({ min: 0 }),
@@ -24,6 +25,7 @@ router.post(
 );
 router.put(
   '/:id',
+  requirePermission('billing:edit'),
   [
     param('id').isMongoId(),
     body('title').optional().notEmpty(),
@@ -34,6 +36,6 @@ router.put(
   validate,
   updateExpense
 );
-router.delete('/:id', [param('id').isMongoId()], validate, deleteExpense);
+router.delete('/:id', requirePermission('billing:edit'), [param('id').isMongoId()], validate, deleteExpense);
 
 module.exports = router;

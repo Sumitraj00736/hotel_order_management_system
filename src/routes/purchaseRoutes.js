@@ -2,17 +2,18 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const auth = require('../middleware/auth');
 const branchScope = require('../middleware/branchScope');
-const requireRole = require('../middleware/requireRole');
+const requirePermission = require('../middleware/requirePermission');
 const validate = require('../middleware/validate');
 const { listPurchases, createPurchase, updatePurchase, deletePurchase } = require('../controllers/purchaseController');
 
 const router = express.Router();
 
-router.use(auth, branchScope, requireRole('admin'));
+router.use(auth, branchScope);
 
-router.get('/', listPurchases);
+router.get('/', requirePermission('billing:view'), listPurchases);
 router.post(
   '/',
+  requirePermission('billing:edit'),
   [
     body('amount').isFloat({ min: 0 }),
     body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
@@ -24,6 +25,7 @@ router.post(
 );
 router.put(
   '/:id',
+  requirePermission('billing:edit'),
   [
     param('id').isMongoId(),
     body('amount').optional().isFloat({ min: 0 }),
@@ -34,6 +36,6 @@ router.put(
   validate,
   updatePurchase
 );
-router.delete('/:id', [param('id').isMongoId()], validate, deletePurchase);
+router.delete('/:id', requirePermission('billing:edit'), [param('id').isMongoId()], validate, deletePurchase);
 
 module.exports = router;

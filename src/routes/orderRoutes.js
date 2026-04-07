@@ -2,7 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const auth = require('../middleware/auth');
 const branchScope = require('../middleware/branchScope');
-const requireRole = require('../middleware/requireRole');
+const requirePermission = require('../middleware/requirePermission');
 const validate = require('../middleware/validate');
 const { listOrders, getOrder, createOrder, updateOrder, updateOrderStatus } = require('../controllers/orderController');
 
@@ -10,12 +10,12 @@ const router = express.Router();
 
 router.use(auth, branchScope);
 
-router.get('/', listOrders);
-router.get('/:id', getOrder);
+router.get('/', requirePermission('orders:view'), listOrders);
+router.get('/:id', requirePermission('orders:view'), getOrder);
 
 router.post(
   '/',
-  requireRole('admin', 'waiter'),
+  requirePermission('orders:edit'),
   [
     body('table').notEmpty(),
     body('items').isArray({ min: 1 }),
@@ -37,7 +37,7 @@ router.post(
 
 router.put(
   '/:id',
-  requireRole('admin', 'waiter'),
+  requirePermission('orders:edit'),
   [
     body('table').optional().notEmpty(),
     body('items').optional().isArray({ min: 1 }),
@@ -57,7 +57,7 @@ router.put(
 
 router.patch(
   '/:id/status',
-  requireRole('admin', 'kitchen'),
+  requirePermission('orders:edit'),
   [body('status').isIn(['pending', 'preparing', 'ready', 'served'])],
   validate,
   updateOrderStatus

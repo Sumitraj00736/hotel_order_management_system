@@ -2,7 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const auth = require('../middleware/auth');
 const branchScope = require('../middleware/branchScope');
-const requireRole = require('../middleware/requireRole');
+const requirePermission = require('../middleware/requirePermission');
 const validate = require('../middleware/validate');
 const { listTables, getTable, createTable, updateTable, deleteTable, freeTable } = require('../controllers/tableController');
 
@@ -10,19 +10,19 @@ const router = express.Router();
 
 router.use(auth, branchScope);
 
-router.get('/', listTables);
-router.get('/:id', getTable);
+router.get('/', requirePermission('tables:view'), listTables);
+router.get('/:id', requirePermission('tables:view'), getTable);
 
 router.post(
   '/',
-  requireRole('admin'),
+  requirePermission('tables:edit'),
   [body('tableNumber').isInt({ min: 1 }), body('row').optional().isInt({ min: 1 }), body('column').optional().isInt({ min: 1 })],
   validate,
   createTable
 );
 router.put(
   '/:id',
-  requireRole('admin'),
+  requirePermission('tables:edit'),
   [
     body('status').optional().isIn(['available', 'occupied']),
     body('row').optional().isInt({ min: 1 }),
@@ -31,7 +31,7 @@ router.put(
   validate,
   updateTable
 );
-router.delete('/:id', requireRole('admin'), deleteTable);
-router.patch('/:id/free', requireRole('admin', 'waiter'), freeTable);
+router.delete('/:id', requirePermission('tables:edit'), deleteTable);
+router.patch('/:id/free', requirePermission('tables:edit'), freeTable);
 
 module.exports = router;

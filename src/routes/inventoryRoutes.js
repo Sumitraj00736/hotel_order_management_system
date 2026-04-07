@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const auth = require('../middleware/auth');
 const branchScope = require('../middleware/branchScope');
-const requireRole = require('../middleware/requireRole');
+const requirePermission = require('../middleware/requirePermission');
 const validate = require('../middleware/validate');
 const {
   listIngredients,
@@ -17,11 +17,12 @@ const {
 
 const router = express.Router();
 
-router.use(auth, branchScope, requireRole('admin'));
+router.use(auth, branchScope);
 
-router.get('/ingredients', listIngredients);
+router.get('/ingredients', requirePermission('inventory:view'), listIngredients);
 router.post(
   '/ingredients',
+  requirePermission('inventory:edit'),
   [
     body('name').notEmpty(),
     body('unit').notEmpty(),
@@ -33,6 +34,7 @@ router.post(
 );
 router.put(
   '/ingredients/:id',
+  requirePermission('inventory:edit'),
   [
     param('id').isMongoId(),
     body('currentStock').optional().isFloat({ min: 0 }),
@@ -43,15 +45,17 @@ router.put(
 );
 router.post(
   '/ingredients/:id/restock',
+  requirePermission('inventory:edit'),
   [param('id').isMongoId(), body('amount').isFloat({ min: 0.01 })],
   validate,
   restockIngredient
 );
 
-router.get('/transactions', listTransactions);
+router.get('/transactions', requirePermission('inventory:view'), listTransactions);
 
 router.post(
   '/recipes',
+  requirePermission('inventory:edit'),
   [
     body('menuItem').isMongoId(),
     body('ingredients').isArray({ min: 1 }),
@@ -62,7 +66,7 @@ router.post(
   setRecipe
 );
 
-router.get('/recipes/:menuItem', [param('menuItem').isMongoId()], validate, getRecipe);
-router.get('/recipes', listRecipes);
+router.get('/recipes/:menuItem', requirePermission('inventory:view'), [param('menuItem').isMongoId()], validate, getRecipe);
+router.get('/recipes', requirePermission('inventory:view'), listRecipes);
 
 module.exports = router;

@@ -4,19 +4,13 @@ const branchScope = require('../middleware/branchScope');
 const requirePermission = require('../middleware/requirePermission');
 const { body } = require('express-validator');
 const validate = require('../middleware/validate');
-const { generateBill, payBill } = require('../controllers/billController');
+const { listFeedback, createFeedback } = require('../controllers/supportController');
 
 const router = express.Router();
 
 router.use(auth, branchScope);
 
-router.get('/:id', requirePermission('orders:checkout:view'), generateBill);
-router.post(
-  '/:id/pay',
-  requirePermission('orders:checkout:edit'),
-  [body('paymentMethod').isIn(['cash', 'fonepay', 'card', 'bank'])],
-  validate,
-  payBill
-);
+router.get('/', requirePermission('settings:view'), listFeedback);
+router.post('/', requirePermission('settings:edit'), [body('message').notEmpty()], validate, createFeedback);
 
 module.exports = router;

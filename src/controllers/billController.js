@@ -3,6 +3,7 @@ const Table = require('../models/Table');
 const CustomerHistory = require('../models/CustomerHistory');
 const { emitOrderUpdate, emitTableUpdate } = require('../utils/socket');
 const { notifyRole, notifyUser } = require('../utils/notify');
+const { logActivity } = require('../utils/activity');
 const { nextSequence } = require('../utils/counter');
 
 const generateBill = async (req, res) => {
@@ -175,6 +176,7 @@ const payBill = async (req, res) => {
     await notifyRole({
       role: 'admin',
       type: 'order:paid',
+      category: 'order',
       message: `Payment received for table ${populated.table?.tableNumber} (${paymentMethod})`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,
@@ -184,10 +186,18 @@ const payBill = async (req, res) => {
       role: 'waiter',
       userId: populated.createdBy?._id,
       type: 'order:paid',
+      category: 'order',
       message: `Order paid for table ${populated.table?.tableNumber} (${paymentMethod})`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,
       branchId: req.branchId
+    });
+    await logActivity({
+      branchId: req.branchId,
+      title: 'Order checked out',
+      type: 'Order Checkout',
+      description: `${req.user?.name || 'Staff'} checked out Table ${populated.table?.tableNumber}`,
+      performedBy: req.user?._id
     });
 
     return res.json({ message: 'Payment recorded', orderId: order._id, status: order.status });

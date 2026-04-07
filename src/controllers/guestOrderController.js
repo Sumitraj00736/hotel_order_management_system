@@ -48,6 +48,7 @@ const createGuestOrder = async (req, res) => {
     await notifyRole({
       role: 'kitchen',
       type: 'order:new',
+      category: 'order',
       message: `Guest order for table ${populated.table?.tableNumber}`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,
@@ -56,6 +57,7 @@ const createGuestOrder = async (req, res) => {
     await notifyRole({
       role: 'admin',
       type: 'order:new',
+      category: 'order',
       message: `Guest booked table ${populated.table?.tableNumber}`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,

@@ -5,6 +5,8 @@ const Branch = require('../models/Branch');
 const Organization = require('../models/Organization');
 const UserBranchRole = require('../models/UserBranchRole');
 const { slugify } = require('../utils/slugify');
+const { logActivity } = require('../utils/activity');
+const { resolveRolePermissions } = require('../utils/permissions');
 
 const createToken = (user) => {
   if (!process.env.JWT_SECRET) {
@@ -53,9 +55,22 @@ const register = async (req, res) => {
     });
     await UserBranchRole.findOneAndUpdate(
       { userId: user._id, branchId: branch._id },
-      { userId: user._id, branchId: branch._id, orgId: org._id, role: 'admin' },
+      {
+        userId: user._id,
+        branchId: branch._id,
+        orgId: org._id,
+        role: 'admin',
+        permissions: resolveRolePermissions({ roleName: 'admin' })
+      },
       { upsert: true, new: true }
     );
+    await logActivity({
+      branchId: branch._id,
+      title: 'Restaurant created',
+      type: 'Restaurant Created',
+      description: `${user.name} created restaurant ${branch.name}`,
+      performedBy: user._id
+    });
 
     // refresh memberships list
     let memberships = await UserBranchRole.find({ userId: user._id, active: true })
@@ -70,7 +85,8 @@ const register = async (req, res) => {
         userId: user._id,
         branchId: fallbackBranch._id,
         orgId: fallbackBranch.orgId,
-        role: user.role
+        role: user.role,
+        permissions: resolveRolePermissions({ roleName: user.role })
       });
       memberships = await UserBranchRole.find({ userId: user._id, active: true })
         .populate('branchId', 'name code')

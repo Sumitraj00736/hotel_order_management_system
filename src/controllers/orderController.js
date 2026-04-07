@@ -7,6 +7,7 @@ const StockTransaction = require('../models/StockTransaction');
 const UserBranchRole = require('../models/UserBranchRole');
 const { emitNewOrder, emitOrderUpdate, emitTableUpdate } = require('../utils/socket');
 const { notifyRole, notifyUser } = require('../utils/notify');
+const { logActivity } = require('../utils/activity');
 const { nextSequence } = require('../utils/counter');
 
 const buildOrderItems = async (items, branchId) => {
@@ -287,24 +288,37 @@ const createOrder = async (req, res) => {
     await notifyRole({
       role: 'kitchen',
       type: 'order:new',
+      category: 'order',
       message: `New order for table ${populated.table?.tableNumber}`,
       orderId: populated._id,
-      tableNumber: populated.table?.tableNumber
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
     });
     await notifyRole({
       role: 'admin',
       type: 'order:new',
+      category: 'order',
       message: `${populated.createdBy?.name || 'Waiter'} booked table ${populated.table?.tableNumber}`,
       orderId: populated._id,
-      tableNumber: populated.table?.tableNumber
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
     });
     await notifyUser({
       role: 'waiter',
       userId: populated.createdBy?._id,
       type: 'order:new',
+      category: 'order',
       message: `You placed an order for table ${populated.table?.tableNumber}`,
       orderId: populated._id,
-      tableNumber: populated.table?.tableNumber
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
+    });
+    await logActivity({
+      branchId: req.branchId,
+      title: 'Order created',
+      type: 'Order Created',
+      description: `${populated.createdBy?.name || 'Staff'} created table order for Table ${populated.table?.tableNumber}`,
+      performedBy: req.user?._id
     });
     return res.status(201).json(populated);
   } catch (error) {
@@ -504,17 +518,28 @@ const updateOrder = async (req, res) => {
     await notifyRole({
       role: 'admin',
       type: 'order:update',
+      category: 'order',
       message: `Order updated for table ${populated.table?.tableNumber}`,
       orderId: populated._id,
-      tableNumber: populated.table?.tableNumber
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
     });
     await notifyUser({
       role: 'waiter',
       userId: populated.createdBy?._id,
       type: 'order:update',
+      category: 'order',
       message: `Order updated for table ${populated.table?.tableNumber}`,
       orderId: populated._id,
-      tableNumber: populated.table?.tableNumber
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
+    });
+    await logActivity({
+      branchId: req.branchId,
+      title: 'Order updated',
+      type: 'Order Updated',
+      description: `${req.user?.name || 'Staff'} updated order for Table ${populated.table?.tableNumber}`,
+      performedBy: req.user?._id
     });
     await session.commitTransaction();
     session.endSession();
@@ -584,17 +609,28 @@ const updateOrderStatus = async (req, res) => {
     await notifyRole({
       role: 'admin',
       type: 'order:status',
+      category: 'order',
       message: `Kitchen set table ${populated.table?.tableNumber} to ${populated.status}`,
       orderId: populated._id,
-      tableNumber: populated.table?.tableNumber
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
     });
     await notifyUser({
       role: 'waiter',
       userId: populated.createdBy?._id,
       type: 'order:status',
+      category: 'order',
       message: `Kitchen set table ${populated.table?.tableNumber} to ${populated.status}`,
       orderId: populated._id,
-      tableNumber: populated.table?.tableNumber
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
+    });
+    await logActivity({
+      branchId: req.branchId,
+      title: 'KOT status changed',
+      type: 'Order KOT Status Updated',
+      description: `${req.user?.name || 'Kitchen'} changed status of KOT for Table ${populated.table?.tableNumber} to ${populated.status}`,
+      performedBy: req.user?._id
     });
     return res.json(populated);
   } catch (error) {
