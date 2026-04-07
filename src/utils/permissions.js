@@ -69,15 +69,6 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'menu:view',
     'notifications:view'
   ],
-  server: [
-    'dashboard:view',
-    'orders:view',
-    'orders:edit',
-    'orders:checkout:view',
-    'tables:view',
-    'menu:view',
-    'notifications:view'
-  ],
   kitchen: [
     'dashboard:view',
     'orders:view',

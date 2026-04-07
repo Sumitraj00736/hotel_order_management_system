@@ -1,9 +1,52 @@
 const Role = require('../models/Role');
 const UserBranchRole = require('../models/UserBranchRole');
+const User = require('../models/User');
+const { DEFAULT_ROLE_PERMISSIONS } = require('../utils/permissions');
+
+const DEFAULT_ROLE_SEEDS = [
+  { name: 'Admin', key: 'admin', color: '#2563eb' },
+  { name: 'Billing', key: 'billing', color: '#f97316' },
+  { name: 'Kitchen', key: 'kitchen', color: '#10b981' },
+  { name: 'Waiter', key: 'waiter', color: '#ef4444' },
+  { name: 'SuperAdmin', key: 'superadmin', color: '#0f172a' }
+];
+
+const ensureDefaultRoles = async (branchId) => {
+  const existing = await Role.find({ branchId });
+  const existingNames = new Set(existing.map((r) => r.name));
+  const created = [];
+  for (const seed of DEFAULT_ROLE_SEEDS) {
+    if (!existingNames.has(seed.name)) {
+      const role = await Role.create({
+        branchId,
+        name: seed.name,
+        description: `${seed.name} default role`,
+        color: seed.color,
+        permissions: DEFAULT_ROLE_PERMISSIONS[seed.key] || []
+      });
+      created.push(role);
+    }
+  }
+  return [...existing, ...created];
+};
+
+const promoteAdminToSuperAdmin = async (req) => {
+  if (!req.user || !req.branchId) return;
+  const membership = await UserBranchRole.findOne({ userId: req.user._id, branchId: req.branchId });
+  if (!membership) return;
+  if (membership.role && membership.role.toLowerCase() === 'superadmin') return;
+  if (membership.role && membership.role.toLowerCase() === 'admin') {
+    membership.role = 'SuperAdmin';
+    membership.permissions = DEFAULT_ROLE_PERMISSIONS.superadmin || ['*'];
+    await membership.save();
+    await User.findByIdAndUpdate(req.user._id, { role: 'superadmin' });
+  }
+};
 
 const listRoles = async (req, res) => {
   const branchId = req.branchId;
-  const roles = await Role.find({ branchId }).sort({ createdAt: 1 });
+  const roles = await ensureDefaultRoles(branchId);
+  await promoteAdminToSuperAdmin(req);
   const counts = await UserBranchRole.aggregate([
     { $match: { branchId } },
     { $group: { _id: '$role', total: { $sum: 1 } } }
