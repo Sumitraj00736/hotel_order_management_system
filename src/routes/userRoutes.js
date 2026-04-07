@@ -4,7 +4,7 @@ const auth = require('../middleware/auth');
 const branchScope = require('../middleware/branchScope');
 const requireRole = require('../middleware/requireRole');
 const validate = require('../middleware/validate');
-const { listUsers, getUser, createUser, updateUser, deleteUser } = require('../controllers/userController');
+const { listUsers, getUser, createUser, updateUser, deleteUser, updateUserStatus } = require('../controllers/userController');
 
 const router = express.Router();
 
@@ -43,6 +43,7 @@ router.put(
   validate,
   updateUser
 );
+router.patch('/:id/status', updateUserStatus);
 router.delete('/:id', deleteUser);
 
 module.exports = router;

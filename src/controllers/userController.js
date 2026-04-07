@@ -7,11 +7,31 @@ const listUsers = async (req, res) => {
   if (!req.branchId) {
     return res.status(400).json({ message: 'Branch required' });
   }
-  const memberships = await UserBranchRole.find({ branchId: req.branchId, active: true }).populate('userId');
-  const users = memberships.map((m) => {
-    const u = m.userId;
-    return u ? { id: u._id, name: u.name, email: u.email, phone: u.phone, role: m.role } : null;
-  }).filter(Boolean);
+  const statusFilter = req.query.status;
+  const membershipFilter = { branchId: req.branchId };
+  if (statusFilter) {
+    membershipFilter.status = statusFilter;
+  }
+  const memberships = await UserBranchRole.find(membershipFilter).populate('userId');
+  const users = memberships
+    .map((m) => {
+      const u = m.userId;
+      if (!u) return null;
+      return {
+        _id: u._id,
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        role: m.role,
+        status: m.status || (m.active ? 'active' : 'inactive'),
+        dateOfJoining: u.dateOfJoining,
+        salary: u.salary,
+        shiftStart: u.shiftStart,
+        shiftEnd: u.shiftEnd
+      };
+    })
+    .filter(Boolean);
   return res.json(users);
 };
 
@@ -25,7 +45,7 @@ const getUser = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { name, email, phone, password, role, dateOfJoining, salary, shiftStart, shiftEnd } = req.body;
+    const { name, email, phone, password, role, dateOfJoining, salary, shiftStart, shiftEnd, status } = req.body;
     if (!req.branchId) {
       return res.status(400).json({ message: 'Branch required to create user' });
     }
@@ -37,8 +57,16 @@ const createUser = async (req, res) => {
       const membership = await UserBranchRole.findOne({ userId: existing._id, branchId: req.branchId, active: true });
       if (membership) return res.status(409).json({ message: 'User already exists in this branch' });
       const hashedExisting = existing.password; // reuse stored hash
-      await UserBranchRole.create({ userId: existing._id, branchId: req.branchId, role, orgId: branch.orgId });
-      return res.status(201).json({ id: existing._id, name: existing.name, email: existing.email, role });
+      const membershipStatus = status || 'active';
+      await UserBranchRole.create({
+        userId: existing._id,
+        branchId: req.branchId,
+        role,
+        orgId: branch.orgId,
+        status: membershipStatus,
+        active: membershipStatus === 'active'
+      });
+      return res.status(201).json({ _id: existing._id, id: existing._id, name: existing.name, email: existing.email, role });
     }
     const hashed = await bcrypt.hash(password, 10);
     const user = await User.create({
@@ -52,10 +80,36 @@ const createUser = async (req, res) => {
       shiftStart,
       shiftEnd
     });
-    await UserBranchRole.create({ userId: user._id, branchId: req.branchId, role, orgId: branch.orgId });
-    return res.status(201).json({ id: user._id, name, email, role: user.role });
+    const membershipStatus = status || 'active';
+    await UserBranchRole.create({
+      userId: user._id,
+      branchId: req.branchId,
+      role,
+      orgId: branch.orgId,
+      status: membershipStatus,
+      active: membershipStatus === 'active'
+    });
+    return res.status(201).json({ _id: user._id, id: user._id, name, email, role: user.role });
   } catch (error) {
     return res.status(500).json({ message: 'Create user failed', error: error.message });
+  }
+};
+
+const updateUserStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!req.branchId) return res.status(400).json({ message: 'Branch required' });
+    if (!status || !['active', 'pending', 'inactive'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    const membership = await UserBranchRole.findOne({ userId: req.params.id, branchId: req.branchId });
+    if (!membership) return res.status(404).json({ message: 'User membership not found' });
+    membership.status = status;
+    membership.active = status === 'active';
+    await membership.save();
+    return res.json({ message: 'Status updated', status });
+  } catch (error) {
+    return res.status(500).json({ message: 'Update user status failed', error: error.message });
   }
 };
 
@@ -85,7 +139,7 @@ const updateUser = async (req, res) => {
     if (password) user.password = await bcrypt.hash(password, 10);
 
     await user.save();
-    return res.json({ id: user._id, name: user.name, email: user.email, role: user.role });
+    return res.json({ _id: user._id, id: user._id, name: user.name, email: user.email, role: user.role });
   } catch (error) {
     return res.status(500).json({ message: 'Update user failed', error: error.message });
   }
@@ -99,4 +153,4 @@ const deleteUser = async (req, res) => {
   return res.json({ message: 'User deleted' });
 };
 
-module.exports = { listUsers, getUser, createUser, updateUser, deleteUser };
+module.exports = { listUsers, getUser, createUser, updateUser, deleteUser, updateUserStatus };

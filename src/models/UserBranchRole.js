@@ -7,6 +7,7 @@ const userBranchRoleSchema = new mongoose.Schema(
     orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
     role: { type: String, enum: ['admin', 'waiter', 'kitchen', 'manager'], required: true },
     permissions: [{ type: String }],
+    status: { type: String, enum: ['active', 'pending', 'inactive'], default: 'active' },
     active: { type: Boolean, default: true }
   },
   { timestamps: true }

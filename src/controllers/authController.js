@@ -115,9 +115,24 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const memberships = await UserBranchRole.find({ userId: user._id, active: true })
+    const allMemberships = await UserBranchRole.find({ userId: user._id })
       .populate('branchId', 'name code')
       .populate('orgId', 'name slug');
+
+    const memberships = allMemberships.filter(
+      (m) => m.status === 'active' || (m.status === undefined && m.active === true)
+    );
+    if (!memberships || memberships.length === 0) {
+      const pendingMembership = allMemberships.find((m) => m.status === 'pending');
+      const inactiveMembership = allMemberships.find((m) => m.status === 'inactive');
+      const blocked = pendingMembership || inactiveMembership || allMemberships[0];
+      return res.status(403).json({
+        message: 'Account is pending or inactive',
+        pendingUser: user.name,
+        branchName: blocked?.branchId?.name || 'your branch',
+        status: blocked?.status || 'inactive'
+      });
+    }
     const branches = memberships.map((m) => ({
       branchId: m.branchId?._id || m.branchId,
       branchName: m.branchId?.name,

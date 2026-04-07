@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const UserBranchRole = require('../models/UserBranchRole');
 const Table = require('../models/Table');
 const MenuItem = require('../models/MenuItem');
 const Order = require('../models/Order');
@@ -76,8 +77,12 @@ const dashboardSnapshot = async (req, res) => {
     const menusCacheKey = `menus:${branchId || 'all'}:all:all:`;
     const cachedMenus = getCache(menusCacheKey);
 
+    const membershipsPromise = branchId
+      ? UserBranchRole.find({ branchId }).populate('userId')
+      : Promise.resolve([]);
+
     const [
-      users,
+      memberships,
       tables,
       menus,
       orders,
@@ -94,7 +99,7 @@ const dashboardSnapshot = async (req, res) => {
       expenses,
       notifications
     ] = await Promise.all([
-      User.find(branchId ? { branchId } : {}).sort({ createdAt: -1 }),
+      membershipsPromise,
       Table.find(branchId ? { branchId } : {}).sort({ tableNumber: 1 }),
       cachedMenus || MenuItem.find(branchId ? { branchId } : {}).sort({ name: 1 }),
       ordersQuery,
@@ -118,6 +123,25 @@ const dashboardSnapshot = async (req, res) => {
     if (includeAnalytics && !cachedAnalytics) {
       setCache(analyticsCacheKey, analytics, 60 * 1000);
     }
+
+    const users = memberships
+      .map((m) => {
+        const u = m.userId;
+        if (!u) return null;
+        return {
+          _id: u._id,
+          id: u._id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone,
+          role: m.role,
+          dateOfJoining: u.dateOfJoining,
+          salary: u.salary,
+          shiftStart: u.shiftStart,
+          shiftEnd: u.shiftEnd
+        };
+      })
+      .filter(Boolean);
 
     return res.json({
       users,

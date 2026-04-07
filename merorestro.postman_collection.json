@@ -121,7 +121,32 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Waiter One\",\n  \"email\": \"waiter@email.com\",\n  \"phone\": \"98XXXXXXXX\",\n  \"password\": \"secret123\",\n  \"role\": \"waiter\",\n  \"dateOfJoining\": \"2026-04-05\",\n  \"salary\": 15000,\n  \"shiftStart\": \"10:00\",\n  \"shiftEnd\": \"18:00\"\n}"
+              "raw": "{\n  \"name\": \"Waiter One\",\n  \"email\": \"waiter@email.com\",\n  \"phone\": \"98XXXXXXXX\",\n  \"password\": \"secret123\",\n  \"role\": \"waiter\",\n  \"status\": \"active\",\n  \"dateOfJoining\": \"2026-04-05\",\n  \"salary\": 15000,\n  \"shiftStart\": \"10:00\",\n  \"shiftEnd\": \"18:00\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update User Status",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/users/{{userId}}/status",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"pending\"\n}"
             }
           }
         },
