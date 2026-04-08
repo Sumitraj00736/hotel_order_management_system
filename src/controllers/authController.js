@@ -20,29 +20,62 @@ const createToken = (user) => {
 const register = async (req, res) => {
   try {
     const { name, email, phone, password, cafeName, branchName } = req.body;
-    const normalizedEmail = email?.toLowerCase();
-    const normalizedPhone = phone?.trim();
-    let user = await User.findOne({
-      $or: [
-        normalizedEmail ? { email: normalizedEmail } : null,
-        normalizedPhone ? { phone: normalizedPhone } : null
-      ].filter(Boolean)
-    });
 
-    if (!user) {
-      if (!password || !name) {
-        return res.status(400).json({ message: 'Name and password are required for new cafe registration' });
-      }
-      const hashed = await bcrypt.hash(password, 10);
-      user = await User.create({ name, email: normalizedEmail, phone: normalizedPhone, password: hashed, role: 'admin' });
+    // ✅ 1. Mandatory field validation
+    const missingFields = [];
+    if (!name?.trim())     missingFields.push('name');
+    if (!email?.trim())    missingFields.push('email');
+    if (!phone?.trim())    missingFields.push('phone');
+    if (!password?.trim()) missingFields.push('password');
+    if (!cafeName?.trim()) missingFields.push('cafeName');
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        message: `Missing required fields: ${missingFields.join(', ')}`
+      });
     }
 
+    // ✅ 2. Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    // ✅ 3. Password strength (min 6 chars)
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const normalizedEmail = email.toLowerCase();
+    const normalizedPhone = phone.trim();
+
+    // ✅ 4. Check email duplicate
+    const emailExists = await User.findOne({ email: normalizedEmail });
+    if (emailExists) {
+      return res.status(409).json({ message: 'Email is already registered' });
+    }
+
+    // ✅ 5. Check phone duplicate
+    const phoneExists = await User.findOne({ phone: normalizedPhone });
+    if (phoneExists) {
+      return res.status(409).json({ message: 'Phone number is already registered' });
+    }
+
+    // ✅ Create new user (no conditional check needed now)
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      password: hashed,
+      role: 'superadmin'
+    });
+
     // create organization + branch for this cafe and attach user as admin
-    const orgName = cafeName || `${name || user.name}'s Cafe`;
+    const orgName = cafeName || `${name}`;
     const baseSlug = slugify(orgName) || 'cafe';
     let orgSlug = baseSlug;
     let suffix = 1;
-    // Ensure unique slug for public URL
     while (await Organization.findOne({ slug: orgSlug })) {
       orgSlug = `${baseSlug}-${suffix}`;
       suffix += 1;
@@ -50,20 +83,22 @@ const register = async (req, res) => {
     const org = await Organization.create({ name: orgName, slug: orgSlug });
     const branch = await Branch.create({
       name: branchName || orgName,
-      code: `${(branchName || orgName || 'main').toLowerCase().replace(/\\s+/g, '-')}-${Date.now().toString(36)}`,
+      code: `${(branchName || orgName || 'main').toLowerCase().replace(/\s+/g, '-')}-${Date.now().toString(36)}`,
       orgId: org._id
     });
+
     await UserBranchRole.findOneAndUpdate(
       { userId: user._id, branchId: branch._id },
       {
         userId: user._id,
         branchId: branch._id,
         orgId: org._id,
-        role: 'admin',
-        permissions: resolveRolePermissions({ roleName: 'admin' })
+        role: 'superadmin',
+        permissions: resolveRolePermissions({ roleName: 'superadmin' })
       },
       { upsert: true, new: true }
     );
+
     await logActivity({
       branchId: branch._id,
       title: 'Restaurant created',
@@ -72,26 +107,10 @@ const register = async (req, res) => {
       performedBy: user._id
     });
 
-    // refresh memberships list
-    let memberships = await UserBranchRole.find({ userId: user._id, active: true })
+    const memberships = await UserBranchRole.find({ userId: user._id, active: true })
       .populate('branchId', 'name code')
       .populate('orgId', 'name slug');
-    if (!memberships.length) {
-      const fallbackBranch = await Branch.findOne();
-      if (!fallbackBranch) {
-        return res.status(403).json({ message: 'No branch assigned. Contact admin.' });
-      }
-      await UserBranchRole.create({
-        userId: user._id,
-        branchId: fallbackBranch._id,
-        orgId: fallbackBranch.orgId,
-        role: user.role,
-        permissions: resolveRolePermissions({ roleName: user.role })
-      });
-      memberships = await UserBranchRole.find({ userId: user._id, active: true })
-        .populate('branchId', 'name code')
-        .populate('orgId', 'name slug');
-    }
+
     const branches = memberships.map((m) => ({
       branchId: m.branchId?._id || m.branchId,
       branchName: m.branchId?.name,
@@ -108,6 +127,7 @@ const register = async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role },
       branches
     });
+
   } catch (error) {
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern || {})[0] || 'field';
@@ -116,7 +136,6 @@ const register = async (req, res) => {
     return res.status(500).json({ message: 'Registration failed', error: error.message });
   }
 };
-
 const login = async (req, res) => {
   try {
     const { email, phone, identifier, password } = req.body;
