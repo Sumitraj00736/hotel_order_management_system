@@ -40,7 +40,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Cafe Name\",\n  \"email\": \"owner@email.com\",\n  \"phone\": \"98XXXXXXXX\",\n  \"password\": \"secret123\"\n}"
+              "raw": "{\n  \"name\": \"Owner Name\",\n  \"email\": \"owner@email.com\",\n  \"phone\": \"98XXXXXXXX\",\n  \"password\": \"secret123\",\n  \"cafeName\": \"My Cafe\",\n  \"branchName\": \"Main Branch\"\n}"
             }
           }
         },
@@ -386,7 +386,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"tableNumber\": 1,\n  \"row\": 1,\n  \"column\": 1\n}"
+              "raw": "{\n  \"tableNumber\": 1,\n  \"name\": \"Cabin 1\",\n  \"type\": \"cabin\",\n  \"spaceId\": \"{{spaceId}}\",\n  \"capacity\": 4,\n  \"charge\": 0\n}"
             }
           }
         },
@@ -411,7 +411,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"available\"\n}"
+              "raw": "{\n  \"name\": \"Cabin 1\",\n  \"type\": \"cabin\",\n  \"spaceId\": \"{{spaceId}}\",\n  \"capacity\": 6,\n  \"charge\": 200,\n  \"status\": \"available\"\n}"
             }
           }
         },
@@ -557,7 +557,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"table\": \"{{tableId}}\",\n  \"items\": [\n    {\n      \"menuItem\": \"{{menuId}}\",\n      \"quantity\": 2,\n      \"variantId\": \"{{variantId}}\",\n      \"variantName\": \"Chicken\",\n      \"variantPrice\": 220,\n      \"itemNote\": \"No onions\",\n      \"isComplimentary\": false\n    }\n  ],\n  \"spiceLevel\": \"medium\",\n  \"specialInstructions\": \"\"\n}"
+              "raw": "{\n  \"table\": \"{{tableId}}\",\n  \"items\": [\n    {\n      \"menuItem\": \"{{menuItemId}}\",\n      \"quantity\": 1,\n      \"isComplimentary\": false,\n      \"itemNote\": \"Less spicy\"\n    }\n  ],\n  \"assignedStaff\": \"{{staffId}}\",\n  \"customerName\": \"Walk-in\"\n}"
             }
           }
         },
