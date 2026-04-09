@@ -33,6 +33,8 @@ const roleRoutes = require('./routes/roleRoutes');
 const billingRoutes = require('./routes/billingRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const supportRoutes = require('./routes/supportRoutes');
+const spaceRoutes = require('./routes/spaceRoutes');
+const qrCodeRoutes = require('./routes/qrCodeRoutes');
 
 const app = express();
 
@@ -119,6 +121,8 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/spaces', spaceRoutes);
+app.use('/api/qr-codes', qrCodeRoutes);
 app.use('/api/public', publicRoutes);
 
 app.use((req, res) => {

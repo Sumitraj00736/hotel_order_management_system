@@ -6,7 +6,9 @@ const { notifyRole } = require('../utils/notify');
 const listTables = async (req, res) => {
   const filter = {};
   if (req.branchId) filter.branchId = req.branchId;
-  const tables = await Table.find(filter).sort({ row: 1, column: 1, tableNumber: 1 });
+  const tables = await Table.find(filter)
+    .populate('spaceId', 'name type')
+    .sort({ row: 1, column: 1, tableNumber: 1 });
   return res.json(tables);
 };
 
@@ -21,6 +23,9 @@ const getTable = async (req, res) => {
 const createTable = async (req, res) => {
   try {
     const payload = { ...req.body, branchId: req.branchId };
+    if (!payload.name && payload.tableNumber) {
+      payload.name = `${payload.type === 'cabin' ? 'Cabin' : 'Table'} ${payload.tableNumber}`;
+    }
     const table = await Table.create(payload);
     return res.status(201).json(table);
   } catch (error) {
@@ -30,9 +35,13 @@ const createTable = async (req, res) => {
 
 const updateTable = async (req, res) => {
   try {
+    const update = { ...req.body };
+    if (update.tableNumber && !update.name) {
+      update.name = `${update.type === 'cabin' ? 'Cabin' : 'Table'} ${update.tableNumber}`;
+    }
     const table = await Table.findOneAndUpdate(
       { _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) },
-      req.body,
+      update,
       { new: true }
     );
     if (!table) {

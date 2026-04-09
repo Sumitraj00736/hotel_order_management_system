@@ -22,10 +22,10 @@ router.post(
     body('password').isLength({ min: 6 }),
     body('role').optional().isString(),
     body('roleId').optional().isMongoId(),
-    body('dateOfJoining').optional().isISO8601(),
-    body('salary').optional().isFloat({ min: 0 }),
-    body('shiftStart').optional().isString(),
-    body('shiftEnd').optional().isString()
+    body('dateOfJoining').optional({ checkFalsy: true }).isISO8601(),
+    body('salary').optional({ checkFalsy: true }).isFloat({ min: 0 }),
+    body('shiftStart').optional({ checkFalsy: true }).isString(),
+    body('shiftEnd').optional({ checkFalsy: true }).isString()
   ],
   validate,
   createUser
@@ -39,10 +39,10 @@ router.put(
     body('password').optional().isLength({ min: 6 }),
     body('role').optional().isString(),
     body('roleId').optional().isMongoId(),
-    body('dateOfJoining').optional().isISO8601(),
-    body('salary').optional().isFloat({ min: 0 }),
-    body('shiftStart').optional().isString(),
-    body('shiftEnd').optional().isString()
+    body('dateOfJoining').optional({ checkFalsy: true }).isISO8601(),
+    body('salary').optional({ checkFalsy: true }).isFloat({ min: 0 }),
+    body('shiftStart').optional({ checkFalsy: true }).isString(),
+    body('shiftEnd').optional({ checkFalsy: true }).isString()
   ],
   validate,
   updateUser
