@@ -6,7 +6,11 @@ const buildQrUrl = ({ baseUrl, tableId, branchId, orgSlug }) => {
   const base = baseUrl.replace(/\/$/, '');
   const params = new URLSearchParams();
   if (branchId) params.set('branchId', branchId);
-  if (orgSlug) params.set('org', orgSlug);
+  // New URL: /:orgSlug/table/:tableId — branded landing page with table context
+  if (orgSlug) {
+    return `${base}/${orgSlug}/table/${tableId}?${params.toString()}`;
+  }
+  // Fallback if no slug: legacy guest route
   return `${base}/guest/${tableId}?${params.toString()}`;
 };
 
@@ -19,15 +23,16 @@ const listQrCodes = async (req, res) => {
   ]);
   const org = branch?.orgId ? await Organization.findById(branch.orgId) : null;
   const baseUrl = process.env.PUBLIC_WEB_URL || 'https://hoteloms.netlify.app';
+  const orgSlug = org?.slug || null;
   const items = tables.map((t) => ({
     tableId: t._id,
     tableNumber: t.tableNumber,
     name: t.name,
     type: t.type,
     spaceId: t.spaceId,
-    url: buildQrUrl({ baseUrl, tableId: t._id, branchId, orgSlug: org?.slug })
+    url: buildQrUrl({ baseUrl, tableId: t._id, branchId, orgSlug })
   }));
-  return res.json({ branchId, orgSlug: org?.slug, baseUrl, items });
+  return res.json({ branchId, orgSlug, baseUrl, items });
 };
 
 module.exports = { listQrCodes };
