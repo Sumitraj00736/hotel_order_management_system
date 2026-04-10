@@ -15,7 +15,8 @@ const listNotifications = async (req, res) => {
     dateTo
   } = req.query;
 
-  const filter = { role };
+  const roleFilter = role === 'superadmin' ? ['admin'] : [role];
+  const filter = { role: { $in: roleFilter } };
   if (req.branchId) filter.branchId = req.branchId;
   filter.$or = [{ userId: _id }, { userId: { $exists: false } }];
 
@@ -40,7 +41,12 @@ const listNotifications = async (req, res) => {
 
 const markRead = async (req, res) => {
   const { role, _id } = req.user;
-  const notification = await Notification.findOne({ _id: req.params.id, role, $or: [{ userId: _id }, { userId: { $exists: false } }] });
+  const roleFilter = role === 'superadmin' ? ['admin'] : [role];
+  const notification = await Notification.findOne({
+    _id: req.params.id,
+    role: { $in: roleFilter },
+    $or: [{ userId: _id }, { userId: { $exists: false } }]
+  });
   if (!notification) {
     return res.status(404).json({ message: 'Notification not found' });
   }
@@ -51,8 +57,9 @@ const markRead = async (req, res) => {
 
 const markAllRead = async (req, res) => {
   const { role, _id } = req.user;
+  const roleFilter = role === 'superadmin' ? ['admin'] : [role];
   await Notification.updateMany(
-    { role, $or: [{ userId: _id }, { userId: { $exists: false } }] },
+    { role: { $in: roleFilter }, $or: [{ userId: _id }, { userId: { $exists: false } }] },
     { $set: { read: true } }
   );
   return res.json({ message: 'All notifications marked as read' });
