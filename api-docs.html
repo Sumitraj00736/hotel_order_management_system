@@ -89,6 +89,17 @@
                     { method: 'DELETE', path: '/users/:id', desc: 'Delete user (superadmin only)', auth: 'staff:edit' }
                 ]
             },
+            customers: {
+                title: 'Customers',
+                endpoints: [
+                    { method: 'GET', path: '/customers', desc: 'List customers (search with ?search=)', auth: 'customers:view' },
+                    { method: 'POST', path: '/customers', desc: 'Create customer', auth: 'customers:edit', body: '{ "name": "req", "phone"?: "string", "email"?: "email", "loyaltyDiscount"?: 0, "openingBalanceType"?: "dr|cr", "openingAmount"?: 0 }' },
+                    { method: 'PUT', path: '/customers/:id', desc: 'Update customer', auth: 'customers:edit' },
+                    { method: 'DELETE', path: '/customers/:id', desc: 'Delete customer', auth: 'customers:edit' },
+                    { method: 'GET', path: '/customers/rewards', desc: 'Get rewards setting', auth: 'customers:view' },
+                    { method: 'PUT', path: '/customers/rewards', desc: 'Update rewards setting', auth: 'customers:edit', body: '{ "salesAmount": 0, "rewardPoints": 0 }' }
+                ]
+            },
             roles: {
                 title: 'Roles & Permissions',
                 endpoints: [

@@ -223,6 +223,137 @@
       ]
     },
     {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "List Customers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/customers",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Customer",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/customers",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer\",\n  \"email\": \"customer@example.com\",\n  \"phone\": \"9800000000\",\n  \"loyaltyDiscount\": 0,\n  \"openingBalanceType\": \"dr\",\n  \"openingAmount\": 0\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/customers/{{customerId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Customer Updated\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/customers/{{customerId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Get Rewards",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/customers/rewards",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Update Rewards",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/customers/rewards",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"salesAmount\": 1000,\n  \"rewardPoints\": 10\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Menu Items",
       "item": [
         {
