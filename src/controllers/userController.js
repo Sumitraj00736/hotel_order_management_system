@@ -6,7 +6,7 @@ const Organization = require('../models/Organization');
 const Role = require('../models/Role');
 const DeletedUser = require('../models/DeletedUser');
 const { logActivity } = require('../utils/activity');
-const { resolveRolePermissions, normalizeRoleKey } = require('../utils/permissions');
+const { resolveRolePermissions, normalizeRoleKey, sanitizeRolePermissions } = require('../utils/permissions');
 
 const resolveRolePayload = async ({ branchId, roleName, roleId }) => {
   if (roleId) {
@@ -88,7 +88,10 @@ const createUser = async (req, res) => {
         userId: existing._id,
         branchId: req.branchId,
         role: resolved?.role || (role ? normalizeRoleKey(role) : 'waiter'),
-        permissions: resolved?.permissions || [],
+        permissions: sanitizeRolePermissions(
+          resolved?.role || (role ? normalizeRoleKey(role) : 'waiter'),
+          resolved?.permissions || []
+        ),
         orgId: branch.orgId,
         status: membershipStatus,
         active: membershipStatus === 'active'
@@ -120,7 +123,10 @@ const createUser = async (req, res) => {
       userId: user._id,
       branchId: req.branchId,
       role: resolved?.role || (role ? normalizeRoleKey(role) : 'waiter'),
-      permissions: resolved?.permissions || [],
+      permissions: sanitizeRolePermissions(
+        resolved?.role || (role ? normalizeRoleKey(role) : 'waiter'),
+        resolved?.permissions || []
+      ),
       orgId: branch.orgId,
       status: membershipStatus,
       active: membershipStatus === 'active'
@@ -192,7 +198,10 @@ const updateUser = async (req, res) => {
         user.role = resolved.role;
         await UserBranchRole.findOneAndUpdate(
           { userId: user._id, branchId: req.branchId },
-          { role: resolved.role, permissions: resolved.permissions || [] }
+          {
+            role: resolved.role,
+            permissions: sanitizeRolePermissions(resolved.role, resolved.permissions || [])
+          }
         );
       }
     }
@@ -224,7 +233,7 @@ const updateUserRole = async (req, res) => {
       return res.status(403).json({ message: 'Owner role cannot be changed' });
     }
     membership.role = resolved.role;
-    membership.permissions = resolved.permissions || [];
+    membership.permissions = sanitizeRolePermissions(resolved.role, resolved.permissions || []);
     await membership.save();
 
     const user = await User.findById(req.params.id);

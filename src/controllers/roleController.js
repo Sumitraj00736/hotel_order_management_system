@@ -1,7 +1,7 @@
 const Role = require('../models/Role');
 const UserBranchRole = require('../models/UserBranchRole');
 const User = require('../models/User');
-const { DEFAULT_ROLE_PERMISSIONS } = require('../utils/permissions');
+const { DEFAULT_ROLE_PERMISSIONS, sanitizeRolePermissions } = require('../utils/permissions');
 
 const DEFAULT_ROLE_SEEDS = [
   { name: 'superadmin', key: 'superadmin', color: '#0f172a' },
@@ -24,9 +24,15 @@ const ensureDefaultRoles = async (branchId) => {
       const needsStar = defaults.includes('*') && !current.includes('*');
       if (needsStar) {
         role.permissions = ['*'];
+        role.isDefault = true;
         await role.save();
       } else if (!needsStar && current.length === 0 && defaults.length > 0) {
         role.permissions = defaults;
+        role.isDefault = true;
+        await role.save();
+      }
+      if (role.isDefault !== true) {
+        role.isDefault = true;
         await role.save();
       }
     }
@@ -40,7 +46,8 @@ const ensureDefaultRoles = async (branchId) => {
         name: seed.name.toLowerCase(),
         description: `${seed.name} default role`,
         color: seed.color,
-        permissions: DEFAULT_ROLE_PERMISSIONS[seed.key] || []
+        permissions: DEFAULT_ROLE_PERMISSIONS[seed.key] || [],
+        isDefault: true
       });
       created.push(role);
     }
@@ -93,7 +100,7 @@ const createRole = async (req, res) => {
     name: normalizedName,
     description: description?.trim(),
     color: color || '#ef4444',
-    permissions: permissions || []
+    permissions: sanitizeRolePermissions(normalizedName, permissions || [])
   });
   return res.status(201).json(role);
 };
@@ -102,6 +109,12 @@ const updateRole = async (req, res) => {
   const update = { ...req.body };
   if (update.name) update.name = update.name.toLowerCase().trim();
   if (update.description) update.description = update.description.trim();
+  if (update.permissions) {
+    const roleDoc = await Role.findOne({ _id: req.params.id, branchId: req.branchId }).select('name');
+    if (roleDoc?.name) {
+      update.permissions = sanitizeRolePermissions(roleDoc.name, update.permissions);
+    }
+  }
   const role = await Role.findOneAndUpdate(
     { _id: req.params.id, branchId: req.branchId },
     update,
@@ -112,8 +125,12 @@ const updateRole = async (req, res) => {
 };
 
 const deleteRole = async (req, res) => {
-  const role = await Role.findOneAndDelete({ _id: req.params.id, branchId: req.branchId });
+  const role = await Role.findOne({ _id: req.params.id, branchId: req.branchId });
   if (!role) return res.status(404).json({ message: 'Role not found' });
+  if (role.isDefault || DEFAULT_ROLE_SEEDS.some((seed) => seed.name === role.name)) {
+    return res.status(400).json({ message: 'Default roles cannot be deleted' });
+  }
+  await Role.findByIdAndDelete(role._id);
   return res.json({ message: 'Role deleted' });
 };
 
