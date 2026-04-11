@@ -170,7 +170,7 @@ const listOrders = async (req, res) => {
     if (req.query.dateTo) filter.createdAt.$lte = new Date(req.query.dateTo);
   }
 
-  if (req.user.role === 'waiter') {
+  if (req.user.role === 'waiter' && req.query.scope !== 'all') {
     filter.$or = [{ createdBy: req.user._id }, { source: 'guest' }];
   }
 
@@ -186,6 +186,7 @@ const listOrders = async (req, res) => {
     .populate('kitchenAssigned', 'name email role')
     .populate('assignedStaff', 'name email role')
     .populate('paidBy', 'name email role')
+    .populate('editLogs.editedBy', 'name email role')
     .sort({ createdAt: -1 });
 
   if (paginate && limit > 0) {
@@ -213,10 +214,6 @@ const getOrder = async (req, res) => {
 
   if (!order) {
     return res.status(404).json({ message: 'Order not found' });
-  }
-
-  if (req.user.role === 'waiter' && order.createdBy._id.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ message: 'Forbidden' });
   }
 
   return res.json(order);
@@ -282,7 +279,8 @@ const createOrder = async (req, res) => {
       .populate('createdBy', 'name email role')
       .populate('kitchenAssigned', 'name email role')
       .populate('assignedStaff', 'name email role')
-      .populate('paidBy', 'name email role');
+      .populate('paidBy', 'name email role')
+      .populate('editLogs.editedBy', 'name email role');
 
     emitNewOrder(populated);
     await notifyRole({
@@ -351,12 +349,6 @@ const updateOrder = async (req, res) => {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ message: 'Paid orders cannot be edited' });
-    }
-
-    if (req.user.role === 'waiter' && order.createdBy.toString() !== req.user._id.toString()) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(403).json({ message: 'Forbidden' });
     }
 
     const changes = [];
