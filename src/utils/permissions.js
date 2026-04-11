@@ -30,6 +30,20 @@ const ALL_PERMISSIONS = [
   'billing:edit'
 ];
 
+const WAITER_ALLOWED_PERMISSIONS = [
+  'dashboard:view',
+  'orders:view',
+  'orders:edit',
+  'orders:checkout:view',
+  'tables:view',
+  'tables:edit',
+  'menu:view',
+  'notifications:view',
+  'customers:view',
+  'customers:edit',
+  'billing:view'
+];
+
 const DEFAULT_ROLE_PERMISSIONS = {
   admin: ['*'],
   superadmin: ['*'],
@@ -66,8 +80,12 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'orders:edit',
     'orders:checkout:view',
     'tables:view',
+    'tables:edit',
     'menu:view',
-    'notifications:view'
+    'notifications:view',
+    'customers:view',
+    'customers:edit',
+    'billing:view'
   ],
   kitchen: [
     'dashboard:view',
@@ -88,10 +106,25 @@ const DEFAULT_ROLE_PERMISSIONS = {
 
 const normalizeRoleKey = (role = '') => role.toLowerCase().trim();
 
+const sanitizeRolePermissions = (roleName, permissions = []) => {
+  const roleKey = normalizeRoleKey(roleName);
+  const list = Array.isArray(permissions) ? permissions : [];
+  if (roleKey !== 'waiter') return list;
+  const allowed = new Set(WAITER_ALLOWED_PERMISSIONS.map((p) => p.toLowerCase()));
+  return list.filter((perm) => allowed.has(String(perm || '').toLowerCase()));
+};
+
 const resolveRolePermissions = ({ roleName }) => {
   if (!roleName) return [];
   const key = normalizeRoleKey(roleName);
   return DEFAULT_ROLE_PERMISSIONS[key] || [];
 };
 
-module.exports = { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, normalizeRoleKey, resolveRolePermissions };
+module.exports = {
+  ALL_PERMISSIONS,
+  DEFAULT_ROLE_PERMISSIONS,
+  WAITER_ALLOWED_PERMISSIONS,
+  normalizeRoleKey,
+  resolveRolePermissions,
+  sanitizeRolePermissions
+};

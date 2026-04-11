@@ -2,9 +2,11 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const UserBranchRole = require('../models/UserBranchRole');
 const Branch = require('../models/Branch');
+const Organization = require('../models/Organization');
 const Role = require('../models/Role');
+const DeletedUser = require('../models/DeletedUser');
 const { logActivity } = require('../utils/activity');
-const { resolveRolePermissions } = require('../utils/permissions');
+const { resolveRolePermissions, normalizeRoleKey, sanitizeRolePermissions } = require('../utils/permissions');
 
 const resolveRolePayload = async ({ branchId, roleName, roleId }) => {
   if (roleId) {
@@ -14,11 +16,12 @@ const resolveRolePayload = async ({ branchId, roleName, roleId }) => {
   }
 
   if (roleName) {
-    const roleDoc = await Role.findOne({ branchId, name: roleName });
+    const normalizedRole = normalizeRoleKey(roleName);
+    const roleDoc = await Role.findOne({ branchId, name: normalizedRole });
     if (roleDoc) {
       return { role: roleDoc.name, permissions: roleDoc.permissions || [] };
     }
-    return { role: roleName, permissions: resolveRolePermissions({ roleName }) };
+    return { role: normalizedRole, permissions: resolveRolePermissions({ roleName: normalizedRole }) };
   }
 
   return { role: undefined, permissions: [] };
@@ -44,7 +47,8 @@ const listUsers = async (req, res) => {
         name: u.name,
         email: u.email,
         phone: u.phone,
-        role: m.role,
+        role: normalizeRoleKey(m.role || ''),
+        isOwner: !!m.isOwner,
         status: m.status || (m.active ? 'active' : 'inactive'),
         dateOfJoining: u.dateOfJoining,
         salary: u.salary,
@@ -83,8 +87,11 @@ const createUser = async (req, res) => {
       await UserBranchRole.create({
         userId: existing._id,
         branchId: req.branchId,
-        role: resolved?.role || role || 'waiter',
-        permissions: resolved?.permissions || [],
+        role: resolved?.role || (role ? normalizeRoleKey(role) : 'waiter'),
+        permissions: sanitizeRolePermissions(
+          resolved?.role || (role ? normalizeRoleKey(role) : 'waiter'),
+          resolved?.permissions || []
+        ),
         orgId: branch.orgId,
         status: membershipStatus,
         active: membershipStatus === 'active'
@@ -93,10 +100,10 @@ const createUser = async (req, res) => {
         branchId: req.branchId,
         title: 'Staff invited',
         type: 'Staffs Invited',
-        description: `${req.user?.name || 'Admin'} invited ${existing.name || existing.email} with ${role || 'staff'} role.`,
+        description: `${req.user?.name || 'Admin'} invited ${existing.name || existing.email} with ${(role ? normalizeRoleKey(role) : 'staff')} role.`,
         performedBy: req.user?._id
       });
-      return res.status(201).json({ _id: existing._id, id: existing._id, name: existing.name, email: existing.email, role });
+      return res.status(201).json({ _id: existing._id, id: existing._id, name: existing.name, email: existing.email, role: normalizeRoleKey(role || '') });
     }
     const hashed = await bcrypt.hash(password, 10);
     const resolved = await resolveRolePayload({ branchId: req.branchId, roleName: role, roleId });
@@ -105,7 +112,7 @@ const createUser = async (req, res) => {
       email,
       phone,
       password: hashed,
-      role: resolved?.role || role,
+      role: resolved?.role || (role ? normalizeRoleKey(role) : undefined),
       dateOfJoining,
       salary,
       shiftStart,
@@ -115,8 +122,11 @@ const createUser = async (req, res) => {
     await UserBranchRole.create({
       userId: user._id,
       branchId: req.branchId,
-      role: resolved?.role || role || 'waiter',
-      permissions: resolved?.permissions || [],
+      role: resolved?.role || (role ? normalizeRoleKey(role) : 'waiter'),
+      permissions: sanitizeRolePermissions(
+        resolved?.role || (role ? normalizeRoleKey(role) : 'waiter'),
+        resolved?.permissions || []
+      ),
       orgId: branch.orgId,
       status: membershipStatus,
       active: membershipStatus === 'active'
@@ -125,7 +135,7 @@ const createUser = async (req, res) => {
       branchId: req.branchId,
       title: 'Staff invited',
       type: 'Staffs Invited',
-      description: `${req.user?.name || 'Admin'} invited ${name} with ${role || 'staff'} role.`,
+      description: `${req.user?.name || 'Admin'} invited ${name} with ${(role ? normalizeRoleKey(role) : 'staff')} role.`,
       performedBy: req.user?._id
     });
     return res.status(201).json({ _id: user._id, id: user._id, name, email, role: user.role });
@@ -167,6 +177,10 @@ const updateUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    const membership = await UserBranchRole.findOne({ userId: user._id, branchId: req.branchId });
+    if (membership?.isOwner && (role || roleId)) {
+      return res.status(403).json({ message: 'Owner role cannot be changed' });
+    }
 
     if ((email && email !== user.email) || (phone && phone !== user.phone)) {
       const existing = await User.findOne({ $or: [{ email }, { phone }] });
@@ -184,7 +198,10 @@ const updateUser = async (req, res) => {
         user.role = resolved.role;
         await UserBranchRole.findOneAndUpdate(
           { userId: user._id, branchId: req.branchId },
-          { role: resolved.role, permissions: resolved.permissions || [] }
+          {
+            role: resolved.role,
+            permissions: sanitizeRolePermissions(resolved.role, resolved.permissions || [])
+          }
         );
       }
     }
@@ -212,8 +229,11 @@ const updateUserRole = async (req, res) => {
 
     const membership = await UserBranchRole.findOne({ userId: req.params.id, branchId: req.branchId });
     if (!membership) return res.status(404).json({ message: 'User membership not found' });
+    if (membership.isOwner) {
+      return res.status(403).json({ message: 'Owner role cannot be changed' });
+    }
     membership.role = resolved.role;
-    membership.permissions = resolved.permissions || [];
+    membership.permissions = sanitizeRolePermissions(resolved.role, resolved.permissions || []);
     await membership.save();
 
     const user = await User.findById(req.params.id);
@@ -237,11 +257,60 @@ const updateUserRole = async (req, res) => {
 };
 
 const deleteUser = async (req, res) => {
-  const user = await User.findByIdAndDelete(req.params.id);
+  if (!req.user || req.user.role?.toLowerCase() !== 'superadmin') {
+    return res.status(403).json({ message: 'Only superadmin can delete users' });
+  }
+  const membership = await UserBranchRole.findOne({ userId: req.params.id, branchId: req.branchId });
+  if (membership?.isOwner) {
+    return res.status(403).json({ message: 'Owner cannot be deleted' });
+  }
+  const user = await User.findById(req.params.id);
   if (!user) {
     return res.status(404).json({ message: 'User not found' });
   }
-  return res.json({ message: 'User deleted' });
+
+  const branch = req.branchId ? await Branch.findById(req.branchId).lean() : null;
+  const org = branch?.orgId ? await Organization.findById(branch.orgId).lean() : null;
+
+  await DeletedUser.create({
+    userId: user._id,
+    branchId: req.branchId,
+    orgId: membership?.orgId,
+    branchName: branch?.name,
+    orgName: org?.name,
+    deletedBy: req.user._id,
+    snapshot: {
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      status: membership?.status,
+      dateOfJoining: user.dateOfJoining,
+      salary: user.salary,
+      shiftStart: user.shiftStart,
+      shiftEnd: user.shiftEnd
+    },
+    membership: membership
+      ? {
+          role: membership.role,
+          permissions: membership.permissions || [],
+          status: membership.status,
+          active: membership.active,
+          isOwner: membership.isOwner
+        }
+      : undefined
+  });
+
+  if (membership) {
+    await UserBranchRole.findByIdAndDelete(membership._id);
+  }
+
+  const remaining = await UserBranchRole.countDocuments({ userId: user._id });
+  if (remaining === 0) {
+    await User.findByIdAndDelete(user._id);
+  }
+
+  return res.json({ message: 'User deleted', archived: true });
 };
 
 module.exports = { listUsers, getUser, createUser, updateUser, deleteUser, updateUserStatus, updateUserRole };

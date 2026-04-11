@@ -6,13 +6,19 @@ const requirePermission = require('../middleware/requirePermission');
 const validate = require('../middleware/validate');
 const {
   listIngredients,
+  listIngredientUnits,
+  createIngredientUnit,
+  updateIngredientUnit,
+  deleteIngredientUnit,
   createIngredient,
   updateIngredient,
   restockIngredient,
   listTransactions,
   setRecipe,
   getRecipe,
-  listRecipes
+  listRecipes,
+  deleteIngredient,
+  deleteRecipe
 } = require('../controllers/inventoryController');
 
 const router = express.Router();
@@ -20,6 +26,28 @@ const router = express.Router();
 router.use(auth, branchScope);
 
 router.get('/ingredients', requirePermission('inventory:view'), listIngredients);
+router.get('/ingredient-units', requirePermission('inventory:view'), listIngredientUnits);
+router.post(
+  '/ingredient-units',
+  requirePermission('inventory:edit'),
+  [body('name').notEmpty()],
+  validate,
+  createIngredientUnit
+);
+router.put(
+  '/ingredient-units/:id',
+  requirePermission('inventory:edit'),
+  [param('id').isMongoId()],
+  validate,
+  updateIngredientUnit
+);
+router.delete(
+  '/ingredient-units/:id',
+  requirePermission('inventory:edit'),
+  [param('id').isMongoId()],
+  validate,
+  deleteIngredientUnit
+);
 router.post(
   '/ingredients',
   requirePermission('inventory:edit'),
@@ -50,6 +78,7 @@ router.post(
   validate,
   restockIngredient
 );
+router.delete('/ingredients/:id', requirePermission('inventory:edit'), [param('id').isMongoId()], validate, deleteIngredient);
 
 router.get('/transactions', requirePermission('inventory:view'), listTransactions);
 
@@ -68,5 +97,6 @@ router.post(
 
 router.get('/recipes/:menuItem', requirePermission('inventory:view'), [param('menuItem').isMongoId()], validate, getRecipe);
 router.get('/recipes', requirePermission('inventory:view'), listRecipes);
+router.delete('/recipes/:id', requirePermission('inventory:edit'), [param('id').isMongoId()], validate, deleteRecipe);
 
 module.exports = router;

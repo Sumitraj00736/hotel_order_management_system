@@ -11,6 +11,18 @@ const branchSchema = new mongoose.Schema(
       currency: { type: String, default: 'NPR' },
       taxRate: { type: Number, default: 0 }
     },
+    websiteSettings: {
+      delivery:     { type: Boolean, default: true },
+      shareMenu:    { type: Boolean, default: true },
+      showPhone:    { type: Boolean, default: true },
+      address:      { type: String,  default: '' },
+      bio:          { type: String,  default: '' },
+      footer:       { type: String,  default: '' },
+      logoUrl:      { type: String,  default: '' },
+      colorPalette: { type: String,  default: 'light' },
+      layout:       { type: String,  default: 'grid' },
+      socialLinks:  [{ label: String, url: String }]
+    },
     active: { type: Boolean, default: true }
   },
   { timestamps: true }

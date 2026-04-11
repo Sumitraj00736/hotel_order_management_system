@@ -7,8 +7,9 @@ const requirePermission = (...required) => (req, res, next) => {
 
   const branchRole = normalizeRoleKey(req.branchRole || req.user.role || '');
   const explicit = Array.isArray(req.branchPermissions) ? req.branchPermissions : [];
-  const fallback = explicit.length ? explicit : DEFAULT_ROLE_PERMISSIONS[branchRole] || [];
-  const permissions = fallback.map((p) => p.toLowerCase());
+  const base = DEFAULT_ROLE_PERMISSIONS[branchRole] || [];
+  const merged = explicit.length ? [...new Set([...base, ...explicit])] : base;
+  const permissions = merged.map((p) => p.toLowerCase());
 
   if (permissions.includes('*')) {
     return next();

@@ -46,7 +46,7 @@
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div class="bg-blue-500 text-white p-6 rounded-xl shadow-lg">
                     <h2 class="text-2xl font-bold mb-2">Base URL</h2>
-                    <code class="bg-white bg-opacity-20 px-3 py-1 rounded text-sm">http://localhost:3000/api</code>
+                    <code class="bg-white bg-opacity-20 px-3 py-1 rounded text-sm">http://localhost:4000/api</code>
                 </div>
                 <div class="bg-green-500 text-white p-6 rounded-xl shadow-lg">
                     <h2 class="text-2xl font-bold mb-2">Auth</h2>
@@ -73,146 +73,266 @@
             auth: {
                 title: 'Authentication',
                 endpoints: [
-                    { method: 'POST', path: '/auth/register', desc: 'Register new user (admin creates staff)', auth: 'No', body: '{ "name": "string", "email": "email", "phone"?: "string", "password": "min6" }' },
-                    { method: 'POST', path: '/auth/login', desc: 'Login with email/phone/password', auth: 'No', body: '{ "email"?: "email", "phone"?: "string", "password": "required" }' }
+                    { method: 'POST', path: '/auth/register', desc: 'Register new cafe (creates org + branch + owner)', auth: 'No', body: '{ "name": "Owner", "email": "email", "phone": "string", "password": "min6", "cafeName": "required", "branchName"?: "optional" }' },
+                    { method: 'POST', path: '/auth/login', desc: 'Login with email/phone/password', auth: 'No', body: '{ "email"?: "email", "phone"?: "string", "identifier"?: "string", "password": "required" }' }
                 ]
             },
             users: {
-                title: 'Users (Admin only)',
+                title: 'Users (Staff)',
                 endpoints: [
-                    { method: 'GET', path: '/users', desc: 'List users', auth: 'Admin' },
-                    { method: 'GET', path: '/users/:id', desc: 'Get user by ID', auth: 'Admin' },
-                    { method: 'POST', path: '/users', desc: 'Create user', auth: 'Admin', body: '{ "name": "req", "email": "email", "role": ["admin","waiter","kitchen"] }' },
-                    { method: 'PUT', path: '/users/:id', desc: 'Update user', auth: 'Admin' },
-                    { method: 'DELETE', path: '/users/:id', desc: 'Delete user', auth: 'Admin' }
+                    { method: 'GET', path: '/users', desc: 'List users', auth: 'staff:view' },
+                    { method: 'GET', path: '/users/:id', desc: 'Get user by ID', auth: 'staff:view' },
+                    { method: 'POST', path: '/users', desc: 'Create user', auth: 'staff:edit', body: '{ "name": "req", "email": "email", "password": "min6", "role"?: "waiter|kitchen|admin", "roleId"?: "id", "dateOfJoining"?: "ISO", "salary"?: "number" }' },
+                    { method: 'PUT', path: '/users/:id', desc: 'Update user', auth: 'staff:edit' },
+                    { method: 'PATCH', path: '/users/:id/status', desc: 'Update user status', auth: 'staff:edit', body: '{ "status": "active|pending|inactive" }' },
+                    { method: 'PATCH', path: '/users/:id/role', desc: 'Update user role', auth: 'staff:edit', body: '{ "role": "waiter|kitchen|admin|superadmin" }' },
+                    { method: 'DELETE', path: '/users/:id', desc: 'Delete user (superadmin only)', auth: 'staff:edit' }
+                ]
+            },
+            customers: {
+                title: 'Customers',
+                endpoints: [
+                    { method: 'GET', path: '/customers', desc: 'List customers (search with ?search=)', auth: 'customers:view' },
+                    { method: 'POST', path: '/customers', desc: 'Create customer', auth: 'customers:edit', body: '{ "name": "req", "phone"?: "string", "email"?: "email", "loyaltyDiscount"?: 0, "openingBalanceType"?: "dr|cr", "openingAmount"?: 0 }' },
+                    { method: 'PUT', path: '/customers/:id', desc: 'Update customer', auth: 'customers:edit' },
+                    { method: 'DELETE', path: '/customers/:id', desc: 'Delete customer', auth: 'customers:edit' },
+                    { method: 'GET', path: '/customers/rewards', desc: 'Get rewards setting', auth: 'customers:view' },
+                    { method: 'PUT', path: '/customers/rewards', desc: 'Update rewards setting', auth: 'customers:edit', body: '{ "salesAmount": 0, "rewardPoints": 0 }' }
+                ]
+            },
+            roles: {
+                title: 'Roles & Permissions',
+                endpoints: [
+                    { method: 'GET', path: '/roles', desc: 'List roles', auth: 'roles:manage' },
+                    { method: 'POST', path: '/roles', desc: 'Create role', auth: 'roles:manage', body: '{ "name": "cashier", "description"?: "string", "color"?: "#hex", "permissions"?: ["orders:view"] }' },
+                    { method: 'PUT', path: '/roles/:id', desc: 'Update role', auth: 'roles:manage' },
+                    { method: 'DELETE', path: '/roles/:id', desc: 'Delete role', auth: 'roles:manage' }
                 ]
             },
             menus: {
                 title: 'Menu Items',
                 endpoints: [
-                    { method: 'GET', path: '/menus', desc: 'List menu items', auth: 'Yes' },
-                    { method: 'GET', path: '/menus/:id', desc: 'Get menu item', auth: 'Yes' },
-                    { method: 'POST', path: '/menus', desc: 'Create menu item (admin)', auth: 'Admin', body: '{ "name": "req", "price": "float>0", "category"?: "id" }' },
-                    { method: 'PUT', path: '/menus/:id', desc: 'Update menu item (admin)', auth: 'Admin' },
-                    { method: 'DELETE', path: '/menus/:id', desc: 'Delete menu item (admin)', auth: 'Admin' }
+                    { method: 'GET', path: '/menus', desc: 'List menu items', auth: 'menu:view' },
+                    { method: 'GET', path: '/menus/:id', desc: 'Get menu item', auth: 'menu:view' },
+                    { method: 'POST', path: '/menus', desc: 'Create menu item', auth: 'menu:edit', body: '{ "name": "req", "price": 0, "category"?: "id", "subMenu"?: "id", "type"?: "Veg|Non-Veg", "imageUrl"?: "url" }' },
+                    { method: 'PUT', path: '/menus/:id', desc: 'Update menu item', auth: 'menu:edit' },
+                    { method: 'DELETE', path: '/menus/:id', desc: 'Delete menu item', auth: 'menu:edit' }
+                ]
+            },
+            categories: {
+                title: 'Categories',
+                endpoints: [
+                    { method: 'GET', path: '/categories', desc: 'List', auth: 'menu:view' },
+                    { method: 'POST', path: '/categories', desc: 'Create', auth: 'menu:edit', body: '{ "name": "req" }' },
+                    { method: 'PUT', path: '/categories/:id', desc: 'Update', auth: 'menu:edit' },
+                    { method: 'DELETE', path: '/categories/:id', desc: 'Delete', auth: 'menu:edit' }
+                ]
+            },
+            submenus: {
+                title: 'Sub Menus',
+                endpoints: [
+                    { method: 'GET', path: '/submenus', desc: 'List', auth: 'menu:view' },
+                    { method: 'POST', path: '/submenus', desc: 'Create', auth: 'menu:edit', body: '{ "name": "req" }' },
+                    { method: 'PUT', path: '/submenus/:id', desc: 'Update', auth: 'menu:edit' },
+                    { method: 'DELETE', path: '/submenus/:id', desc: 'Delete', auth: 'menu:edit' }
+                ]
+            },
+            addons: {
+                title: 'Add Ons',
+                endpoints: [
+                    { method: 'GET', path: '/addons', desc: 'List', auth: 'menu:view' },
+                    { method: 'POST', path: '/addons', desc: 'Create', auth: 'menu:edit', body: '{ "name": "req", "price": 0 }' },
+                    { method: 'PUT', path: '/addons/:id', desc: 'Update', auth: 'menu:edit' },
+                    { method: 'DELETE', path: '/addons/:id', desc: 'Delete', auth: 'menu:edit' }
+                ]
+            },
+            combos: {
+                title: 'Combo Offers',
+                endpoints: [
+                    { method: 'GET', path: '/combos', desc: 'List combos', auth: 'menu:view' },
+                    { method: 'POST', path: '/combos', desc: 'Create combo', auth: 'menu:edit', body: '{ "name": "req", "priceActual": 0, "priceOffer": 0, "items": [{"menuItem":"id","quantity":1,"unitPrice":0}] }' },
+                    { method: 'PUT', path: '/combos/:id', desc: 'Update', auth: 'menu:edit' },
+                    { method: 'DELETE', path: '/combos/:id', desc: 'Delete', auth: 'menu:edit' }
                 ]
             },
             tables: {
                 title: 'Tables',
                 endpoints: [
-                    { method: 'GET', path: '/tables', desc: 'List tables', auth: 'Yes' },
-                    { method: 'GET', path: '/tables/:id', desc: 'Get table', auth: 'Yes' },
-                    { method: 'POST', path: '/tables', desc: 'Create table (admin)', auth: 'Admin', body: '{ "tableNumber": "int>0" }' },
-                    { method: 'PUT', path: '/tables/:id', desc: 'Update table (admin)', auth: 'Admin' },
-                    { method: 'DELETE', path: '/tables/:id', desc: 'Delete table (admin)', auth: 'Admin' },
-                    { method: 'PATCH', path: '/tables/:id/free', desc: 'Free table', auth: 'Admin/Waiter' }
+                    { method: 'GET', path: '/tables', desc: 'List tables', auth: 'tables:view' },
+                    { method: 'GET', path: '/tables/:id', desc: 'Get table', auth: 'tables:view' },
+                    { method: 'POST', path: '/tables', desc: 'Create table', auth: 'tables:edit', body: '{ "tableNumber": 1, "name"?: "Cabin 1", "type"?: "cabin", "spaceId"?: "id", "capacity"?: 4, "charge"?: 0 }' },
+                    { method: 'PUT', path: '/tables/:id', desc: 'Update table', auth: 'tables:edit' },
+                    { method: 'PATCH', path: '/tables/:id/free', desc: 'Free table', auth: 'tables:edit' },
+                    { method: 'DELETE', path: '/tables/:id', desc: 'Delete table', auth: 'tables:edit' }
+                ]
+            },
+            spaces: {
+                title: 'Spaces',
+                endpoints: [
+                    { method: 'GET', path: '/spaces', desc: 'List spaces', auth: 'tables:view' },
+                    { method: 'POST', path: '/spaces', desc: 'Create space', auth: 'tables:edit', body: '{ "name": "Cabin", "type"?: "Private", "capacity"?: 8, "charge"?: 0 }' },
+                    { method: 'PUT', path: '/spaces/:id', desc: 'Update space', auth: 'tables:edit' },
+                    { method: 'DELETE', path: '/spaces/:id', desc: 'Delete space', auth: 'tables:edit' }
+                ]
+            },
+            qrCodes: {
+                title: 'QR Codes',
+                endpoints: [
+                    { method: 'GET', path: '/qr-codes', desc: 'List QR codes for tables', auth: 'tables:view' }
                 ]
             },
             orders: {
                 title: 'Orders',
                 endpoints: [
-                    { method: 'GET', path: '/orders', desc: 'List orders', auth: 'Yes' },
-                    { method: 'GET', path: '/orders/:id', desc: 'Get order', auth: 'Yes' },
-                    { method: 'POST', path: '/orders', desc: 'Create order', auth: 'Admin/Waiter', body: '{ "table": "id", "items": [{ "menuItem": "id", "quantity": "int>0" }] }' },
-                    { method: 'PUT', path: '/orders/:id', desc: 'Update order', auth: 'Admin/Waiter' },
-                    { method: 'PATCH', path: '/orders/:id/status', desc: 'Update status (kitchen)', auth: 'Admin/Kitchen', body: '{ "status": ["pending","preparing","ready","served"] }' }
-                ]
-            },
-            reports: {
-                title: 'Reports (Admin)',
-                endpoints: [
-                    { method: 'GET', path: '/reports/summary', desc: 'Summary report', auth: 'Admin' },
-                    { method: 'GET', path: '/reports/overview', desc: 'Overview report', auth: 'Admin' },
-                    { method: 'GET', path: '/reports/analytics', desc: 'Analytics report', auth: 'Admin' },
-                    { method: 'GET', path: '/reports/history', desc: 'Customer history', auth: 'Admin' },
-                    { method: 'GET', path: '/reports/stock', desc: 'Stock report', auth: 'Admin' }
+                    { method: 'GET', path: '/orders', desc: 'List orders', auth: 'orders:view' },
+                    { method: 'GET', path: '/orders/:id', desc: 'Get order', auth: 'orders:view' },
+                    { method: 'POST', path: '/orders', desc: 'Create order', auth: 'orders:edit', body: '{ "table": "id", "items": [{ "menuItem": "id", "quantity": 1, "isComplimentary"?: false }] }' },
+                    { method: 'PUT', path: '/orders/:id', desc: 'Update order', auth: 'orders:edit' },
+                    { method: 'PATCH', path: '/orders/:id/status', desc: 'Update status', auth: 'orders:edit', body: '{ "status": "pending|preparing|ready|served" }' }
                 ]
             },
             bills: {
                 title: 'Bills',
                 endpoints: [
-                    { method: 'GET', path: '/bills/:id', desc: 'Generate bill PDF', auth: 'Admin/Waiter' },
-                    { method: 'POST', path: '/bills/:id/pay', desc: 'Pay bill (admin)', auth: 'Admin', body: '{ "paymentMethod": ["cash","fonepay"] }' }
+                    { method: 'GET', path: '/bills/:id', desc: 'Generate bill PDF', auth: 'orders:checkout:view' },
+                    { method: 'POST', path: '/bills/:id/pay', desc: 'Pay bill', auth: 'orders:checkout:edit', body: '{ "paymentMethod": "cash|fonepay|card|bank" }' }
+                ]
+            },
+            purchases: {
+                title: 'Purchases',
+                endpoints: [
+                    { method: 'GET', path: '/purchases', desc: 'List purchases', auth: 'billing:view' },
+                    { method: 'POST', path: '/purchases', desc: 'Create purchase', auth: 'billing:edit', body: '{ "amount": 0, "paymentMethod"?: "cash", "paidAt"?: "ISO" }' },
+                    { method: 'PUT', path: '/purchases/:id', desc: 'Update purchase', auth: 'billing:edit' },
+                    { method: 'DELETE', path: '/purchases/:id', desc: 'Delete purchase', auth: 'billing:edit' }
+                ]
+            },
+            expenses: {
+                title: 'Expenses',
+                endpoints: [
+                    { method: 'GET', path: '/expenses', desc: 'List expenses', auth: 'billing:view' },
+                    { method: 'POST', path: '/expenses', desc: 'Create expense', auth: 'billing:edit', body: '{ "title": "req", "amount": 0, "paymentMethod"?: "cash", "paidAt"?: "ISO" }' },
+                    { method: 'PUT', path: '/expenses/:id', desc: 'Update expense', auth: 'billing:edit' },
+                    { method: 'DELETE', path: '/expenses/:id', desc: 'Delete expense', auth: 'billing:edit' }
+                ]
+            },
+            reports: {
+                title: 'Reports',
+                endpoints: [
+                    { method: 'GET', path: '/reports/summary', desc: 'Summary report', auth: 'reports:view' },
+                    { method: 'GET', path: '/reports/overview', desc: 'Overview report', auth: 'reports:view' },
+                    { method: 'GET', path: '/reports/analytics', desc: 'Analytics report', auth: 'reports:view' },
+                    { method: 'GET', path: '/reports/history', desc: 'Customer history', auth: 'reports:view' },
+                    { method: 'GET', path: '/reports/stock', desc: 'Stock report', auth: 'reports:view' },
+                    { method: 'GET', path: '/reports/transactions', desc: 'Transaction history (JSON)', auth: 'reports:view' },
+                    { method: 'GET', path: '/reports/transactions?format=csv', desc: 'Transaction history (CSV)', auth: 'reports:view' },
+                    { method: 'GET', path: '/reports/order-dashboard', desc: 'Order dashboard data', auth: 'reports:view' },
+                    { method: 'GET', path: '/reports/overview-dashboard', desc: 'Overview dashboard data', auth: 'reports:view' },
+                    { method: 'GET', path: '/reports/finance-dashboard', desc: 'Finance dashboard data', auth: 'reports:view' }
+                ]
+            },
+            dashboard: {
+                title: 'Dashboard Snapshot',
+                endpoints: [
+                    { method: 'GET', path: '/dashboard', desc: 'Consolidated dashboard payload', auth: 'dashboard:view' }
+                ]
+            },
+            billing: {
+                title: 'Billing & Subscription',
+                endpoints: [
+                    { method: 'GET', path: '/billing/summary', desc: 'Billing summary', auth: 'billing:view' }
                 ]
             },
             notifications: {
                 title: 'Notifications',
                 endpoints: [
-                    { method: 'GET', path: '/notifications', desc: 'List notifications', auth: 'Yes' },
-                    { method: 'PATCH', path: '/notifications/:id/read', desc: 'Mark single read', auth: 'Yes' },
-                    { method: 'PATCH', path: '/notifications/read/all', desc: 'Mark all read', auth: 'Yes' }
+                    { method: 'GET', path: '/notifications', desc: 'List notifications', auth: 'notifications:view' },
+                    { method: 'PATCH', path: '/notifications/:id/read', desc: 'Mark single read', auth: 'notifications:edit' },
+                    { method: 'PATCH', path: '/notifications/read/all', desc: 'Mark all read', auth: 'notifications:edit' }
                 ]
             },
             profile: {
                 title: 'Profile',
                 endpoints: [
                     { method: 'GET', path: '/profile/me', desc: 'Get current user profile', auth: 'Yes' },
-                    { method: 'GET', path: '/profile/waiter/analytics', desc: 'Waiter analytics', auth: 'Waiter' }
+                    { method: 'GET', path: '/profile/waiter/analytics', desc: 'Waiter analytics', auth: 'orders:view' }
                 ]
             },
             promotions: {
                 title: 'Promotions',
                 endpoints: [
-                    { method: 'GET', path: '/promotions/me', desc: 'My promotions', auth: 'Yes' },
-                    { method: 'GET', path: '/promotions/:id', desc: 'List promotions (admin)', auth: 'Admin' },
-                    { method: 'POST', path: '/promotions/:id', desc: 'Add promotion (admin)', auth: 'Admin', body: '{ "title": "req", "effectiveDate": "ISO" }' }
+                    { method: 'GET', path: '/promotions/me', desc: 'My promotions', auth: 'staff:view' },
+                    { method: 'GET', path: '/promotions/:id', desc: 'List promotions (user)', auth: 'staff:view' },
+                    { method: 'POST', path: '/promotions/:id', desc: 'Add promotion', auth: 'staff:edit', body: '{ "title": "req", "effectiveDate": "ISO" }' }
                 ]
             },
             inventory: {
-                title: 'Inventory (Admin)',
+                title: 'Inventory',
                 endpoints: [
-                    { method: 'GET', path: '/inventory/ingredients', desc: 'List ingredients', auth: 'Admin' },
-                    { method: 'POST', path: '/inventory/ingredients', desc: 'Create ingredient', auth: 'Admin' },
-                    { method: 'PUT', path: '/inventory/ingredients/:id', desc: 'Update ingredient', auth: 'Admin' },
-                    { method: 'POST', path: '/inventory/ingredients/:id/restock', desc: 'Restock', auth: 'Admin' },
-                    { method: 'GET', path: '/inventory/transactions', desc: 'Stock transactions', auth: 'Admin' },
-                    { method: 'POST', path: '/inventory/recipes', desc: 'Set recipe', auth: 'Admin' },
-                    { method: 'GET', path: '/inventory/recipes/:menuItem', desc: 'Get recipe', auth: 'Admin' },
-                    { method: 'GET', path: '/inventory/recipes', desc: 'List recipes', auth: 'Admin' }
+                    { method: 'GET', path: '/inventory/ingredients', desc: 'List ingredients', auth: 'inventory:view' },
+                    { method: 'POST', path: '/inventory/ingredients', desc: 'Create ingredient', auth: 'inventory:edit' },
+                    { method: 'PUT', path: '/inventory/ingredients/:id', desc: 'Update ingredient', auth: 'inventory:edit' },
+                    { method: 'POST', path: '/inventory/ingredients/:id/restock', desc: 'Restock', auth: 'inventory:edit' },
+                    { method: 'GET', path: '/inventory/transactions', desc: 'Stock transactions', auth: 'inventory:view' },
+                    { method: 'POST', path: '/inventory/recipes', desc: 'Set recipe', auth: 'inventory:edit' },
+                    { method: 'GET', path: '/inventory/recipes/:menuItem', desc: 'Get recipe', auth: 'inventory:view' },
+                    { method: 'GET', path: '/inventory/recipes', desc: 'List recipes', auth: 'inventory:view' }
+                ]
+            },
+            settings: {
+                title: 'Settings',
+                endpoints: [
+                    { method: 'GET', path: '/settings/restaurant-details', desc: 'Get restaurant details', auth: 'settings:view' },
+                    { method: 'PUT', path: '/settings/restaurant-details', desc: 'Update restaurant details', auth: 'settings:edit' },
+                    { method: 'GET', path: '/settings/tax-rates', desc: 'Get tax rates settings', auth: 'settings:view' },
+                    { method: 'PUT', path: '/settings/tax-rates', desc: 'Update tax rates settings', auth: 'settings:edit' },
+                    { method: 'GET', path: '/settings/notifications', desc: 'Get notification settings', auth: 'settings:view' },
+                    { method: 'PUT', path: '/settings/notifications', desc: 'Update notification settings', auth: 'settings:edit' },
+                    { method: 'GET', path: '/settings/invoice', desc: 'Get invoice settings', auth: 'settings:view' },
+                    { method: 'PUT', path: '/settings/invoice', desc: 'Update invoice settings', auth: 'settings:edit' },
+                    { method: 'GET', path: '/settings/kot', desc: 'Get KOT settings', auth: 'settings:view' },
+                    { method: 'PUT', path: '/settings/kot', desc: 'Update KOT settings', auth: 'settings:edit' },
+                    { method: 'GET', path: '/settings/printer', desc: 'Get printer settings', auth: 'settings:view' },
+                    { method: 'PUT', path: '/settings/printer', desc: 'Update printer settings', auth: 'settings:edit' }
+                ]
+            },
+            taxes: {
+                title: 'Taxes',
+                endpoints: [
+                    { method: 'GET', path: '/taxes', desc: 'List taxes', auth: 'settings:view' },
+                    { method: 'POST', path: '/taxes', desc: 'Create tax', auth: 'settings:edit' },
+                    { method: 'PUT', path: '/taxes/:id', desc: 'Update tax', auth: 'settings:edit' },
+                    { method: 'DELETE', path: '/taxes/:id', desc: 'Delete tax', auth: 'settings:edit' }
+                ]
+            },
+            departments: {
+                title: 'Departments',
+                endpoints: [
+                    { method: 'GET', path: '/departments', desc: 'List departments', auth: 'settings:view' },
+                    { method: 'POST', path: '/departments', desc: 'Create department', auth: 'settings:edit' },
+                    { method: 'PUT', path: '/departments/:id', desc: 'Update department', auth: 'settings:edit' },
+                    { method: 'DELETE', path: '/departments/:id', desc: 'Delete department', auth: 'settings:edit' }
+                ]
+            },
+            activityLogs: {
+                title: 'Activity Logs',
+                endpoints: [
+                    { method: 'GET', path: '/activity-logs', desc: 'List activity logs', auth: 'settings:view' }
+                ]
+            },
+            support: {
+                title: 'Support & Feedback',
+                endpoints: [
+                    { method: 'GET', path: '/support', desc: 'List feedback', auth: 'settings:view' },
+                    { method: 'POST', path: '/support', desc: 'Create feedback', auth: 'settings:edit', body: '{ "message": "req" }' }
                 ]
             },
             guest: {
                 title: 'Guest API (Limited)',
                 endpoints: [
-                    { method: 'GET', path: '/guest/menu', desc: 'Public menu', auth: 'No' },
+                    { method: 'GET', path: '/guest/menu', desc: 'Public menu (requires x-branch-id)', auth: 'No' },
                     { method: 'GET', path: '/guest/tables/:tableId/status', desc: 'Table status', auth: 'No' },
                     { method: 'POST', path: '/guest/orders', desc: 'Guest order', auth: 'No', body: '{ "table": "id", "items": [...] }' }
-                ]
-            },
-            categories: {
-                title: 'Categories (Admin)',
-                endpoints: [
-                    { method: 'GET', path: '/categories', desc: 'List', auth: 'Admin' },
-                    { method: 'POST', path: '/categories', desc: 'Create', auth: 'Admin', body: '{ "name": "req" }' },
-                    { method: 'PUT', path: '/categories/:id', desc: 'Update', auth: 'Admin' },
-                    { method: 'DELETE', path: '/categories/:id', desc: 'Delete', auth: 'Admin' }
-                ]
-            },
-            submenus: {
-                title: 'Sub Menus (Admin)',
-                endpoints: [
-                    { method: 'GET', path: '/submenus', desc: 'List', auth: 'Admin' },
-                    { method: 'POST', path: '/submenus', desc: 'Create', auth: 'Admin', body: '{ "name": "req" }' },
-                    { method: 'PUT', path: '/submenus/:id', desc: 'Update', auth: 'Admin' },
-                    { method: 'DELETE', path: '/submenus/:id', desc: 'Delete', auth: 'Admin' }
-                ]
-            },
-            addons: {
-                title: 'Add Ons (Admin)',
-                endpoints: [
-                    { method: 'GET', path: '/addons', desc: 'List', auth: 'Admin' },
-                    { method: 'POST', path: '/addons', desc: 'Create', auth: 'Admin', body: '{ "name": "req", "price": "float>=0" }' },
-                    { method: 'PUT', path: '/addons/:id', desc: 'Update', auth: 'Admin' },
-                    { method: 'DELETE', path: '/addons/:id', desc: 'Delete', auth: 'Admin' }
-                ]
-            },
-            combos: {
-                title: 'Combo Offers (Admin)',
-                endpoints: [
-                    { method: 'GET', path: '/combos', desc: 'List combos', auth: 'Admin' },
-                    { method: 'POST', path: '/combos', desc: 'Create combo', auth: 'Admin', body: '{ "name": "req", "items": [{menuItem, quantity, unitPrice}] }' },
-                    { method: 'PUT', path: '/combos/:id', desc: 'Update', auth: 'Admin' },
-                    { method: 'DELETE', path: '/combos/:id', desc: 'Delete', auth: 'Admin' }
                 ]
             },
             public: {
@@ -221,7 +341,7 @@
                     { method: 'GET', path: '/public/cafes/:slug', desc: 'Get cafe by slug', auth: 'No' }
                 ]
             }
-        };
+        };};
 
         // Theme toggle
         if (localStorage.theme === 'dark' || (!localStorage.theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {

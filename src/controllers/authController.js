@@ -94,7 +94,8 @@ const register = async (req, res) => {
         branchId: branch._id,
         orgId: org._id,
         role: 'superadmin',
-        permissions: resolveRolePermissions({ roleName: 'superadmin' })
+        permissions: resolveRolePermissions({ roleName: 'superadmin' }),
+        isOwner: true
       },
       { upsert: true, new: true }
     );
