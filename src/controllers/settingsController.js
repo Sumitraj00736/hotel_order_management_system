@@ -1,14 +1,16 @@
 const Branch = require('../models/Branch');
 const BranchSettings = require('../models/BranchSettings');
+const Organization = require('../models/Organization');
 
 const ensureSettings = async (branchId) => {
   let settings = await BranchSettings.findOne({ branchId });
+  const branch = await Branch.findById(branchId).lean();
+  const organization = branch?.orgId ? await Organization.findById(branch.orgId).lean() : null;
   if (!settings) {
-    const branch = await Branch.findById(branchId).lean();
     settings = await BranchSettings.create({
       branchId,
       restaurant: {
-        name: branch?.name || '',
+        name: organization?.name || branch?.name || '',
         address: branch?.address || '',
         currency: branch?.settings?.currency || 'NPR',
         priceField: branch?.settings?.currency || 'NPR'
@@ -21,16 +23,19 @@ const ensureSettings = async (branchId) => {
       }
     });
   }
-  return settings;
+  return { settings, branch, organization };
 };
 
 const getRestaurantDetails = async (req, res) => {
-  const settings = await ensureSettings(req.branchId);
-  return res.json(settings.restaurant || {});
+  const { settings, organization } = await ensureSettings(req.branchId);
+  return res.json({
+    ...(settings.restaurant || {}),
+    name: organization?.name || settings.restaurant?.name || ''
+  });
 };
 
 const updateRestaurantDetails = async (req, res) => {
-  const settings = await ensureSettings(req.branchId);
+  const { settings, branch } = await ensureSettings(req.branchId);
   const payload = req.body || {};
   settings.restaurant = {
     ...settings.restaurant.toObject(),
@@ -39,7 +44,7 @@ const updateRestaurantDetails = async (req, res) => {
   await settings.save();
 
   if (payload.name) {
-    await Branch.findByIdAndUpdate(req.branchId, { name: payload.name });
+    await Organization.findByIdAndUpdate(branch?.orgId, { name: payload.name });
   }
   if (payload.address) {
     await Branch.findByIdAndUpdate(req.branchId, { address: payload.address });
