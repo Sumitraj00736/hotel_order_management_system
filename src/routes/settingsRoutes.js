@@ -20,6 +20,13 @@ const {
 const router = express.Router();
 
 router.use(auth, branchScope);
+router.use((req, res, next) => {
+  const role = (req.branchRole || req.user?.role || '').toLowerCase();
+  if (role !== 'superadmin') {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  return next();
+});
 
 router.get('/restaurant-details', requirePermission('settings:view'), getRestaurantDetails);
 router.put('/restaurant-details', requirePermission('settings:edit'), updateRestaurantDetails);
