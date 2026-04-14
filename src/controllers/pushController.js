@@ -1,5 +1,5 @@
 const PushSubscription = require('../models/PushSubscription');
-const { getPublicKey } = require('../utils/pushService');
+const { getPublicKey, isConfigured, sendPushToUser } = require('../utils/pushService');
 
 const getPublicKeyController = async (req, res) => {
   return res.json({ publicKey: getPublicKey() });
@@ -74,4 +74,22 @@ const status = async (req, res) => {
   return res.json({ exists: true, enabled: doc.enabled });
 };
 
-module.exports = { subscribe, unsubscribe, toggle, status, getPublicKeyController };
+const testPush = async (req, res) => {
+  if (!isConfigured()) {
+    return res.status(503).json({ message: 'Push not configured' });
+  }
+  const { title, body } = req.body || {};
+  const enabledSubs = await PushSubscription.find({ userId: req.user._id, enabled: true, provider: 'webpush' });
+  if (!enabledSubs.length) {
+    return res.status(404).json({ message: 'No enabled subscriptions for this device' });
+  }
+  await sendPushToUser({
+    userId: req.user._id,
+    title: title || 'Test Notification',
+    body: body || 'This is a test push from MeroRestro',
+    data: { url: '/' }
+  });
+  return res.json({ message: 'Push sent', count: enabledSubs.length });
+};
+
+module.exports = { subscribe, unsubscribe, toggle, status, getPublicKeyController, testPush };
