@@ -150,7 +150,7 @@ const login = async (req, res) => {
     if (!match) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-
+ 
     const allMemberships = await UserBranchRole.find({ userId: user._id })
       .populate('branchId', 'name code')
       .populate('orgId', 'name slug');
