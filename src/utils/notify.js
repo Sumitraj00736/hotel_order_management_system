@@ -1,5 +1,6 @@
 const Notification = require('../models/Notification');
 const { emitNotification } = require('./socket');
+const { sendPushToRole, sendPushToUser } = require('./pushService');
 
 const notifyRole = async ({ role, message, type, category = 'activity', branchId, orderId, tableNumber, staffId, dishId, supplierId, customerId, stockItemId }) => {
   const doc = await Notification.create({ role, message, type, category, branchId, orderId, tableNumber, staffId, dishId, supplierId, customerId, stockItemId });
@@ -17,6 +18,13 @@ const notifyRole = async ({ role, message, type, category = 'activity', branchId
     customerId,
     stockItemId,
     createdAt: doc.createdAt
+  });
+  await sendPushToRole({
+    branchId,
+    role,
+    title: type || 'Notification',
+    body: message,
+    data: { orderId, tableNumber, category }
   });
 };
 
@@ -37,6 +45,12 @@ const notifyUser = async ({ role, userId, message, type, category = 'activity', 
     customerId,
     stockItemId,
     createdAt: doc.createdAt
+  });
+  await sendPushToUser({
+    userId,
+    title: type || 'Notification',
+    body: message,
+    data: { orderId, tableNumber, category }
   });
 };
 

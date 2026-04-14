@@ -301,6 +301,24 @@ const createOrder = async (req, res) => {
       tableNumber: populated.table?.tableNumber,
       branchId: req.branchId
     });
+    await notifyRole({
+      role: 'superadmin',
+      type: 'order:new',
+      category: 'order',
+      message: `${populated.createdBy?.name || 'Waiter'} booked table ${populated.table?.tableNumber}`,
+      orderId: populated._id,
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
+    });
+    await notifyRole({
+      role: 'waiter',
+      type: 'order:new',
+      category: 'order',
+      message: `${populated.createdBy?.name || 'Waiter'} booked table ${populated.table?.tableNumber}`,
+      orderId: populated._id,
+      tableNumber: populated.table?.tableNumber,
+      branchId: req.branchId
+    });
     await notifyUser({
       role: 'waiter',
       userId: populated.createdBy?._id,

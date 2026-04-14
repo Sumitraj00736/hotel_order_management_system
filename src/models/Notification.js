@@ -5,7 +5,7 @@ const notificationSchema = new mongoose.Schema(
     message: { type: String, required: true },
     type: { type: String, required: true },
     category: { type: String, enum: ['activity', 'order'], default: 'activity' },
-    role: { type: String, enum: ['admin', 'waiter', 'kitchen'], required: true },
+    role: { type: String, enum: ['admin', 'superadmin', 'waiter', 'kitchen'], required: true },
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
