@@ -7,6 +7,13 @@ const { listRoles, createRole, updateRole, deleteRole } = require('../controller
 const router = express.Router();
 
 router.use(auth, branchScope);
+router.use((req, res, next) => {
+  const role = (req.branchRole || req.user?.role || '').toLowerCase();
+  if (role !== 'superadmin') {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  return next();
+});
 
 router.get('/', requirePermission('roles:manage'), listRoles);
 router.post('/', requirePermission('roles:manage'), createRole);
