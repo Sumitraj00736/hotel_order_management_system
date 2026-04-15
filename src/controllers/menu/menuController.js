@@ -1,0 +1,67 @@
+const MenuItem = require('../../models/menu/MenuItem');
+const { getCache, setCache, clearCachePrefix } = require('../../utils/cache');
+
+const listMenu = async (req, res) => {
+  const { search, category, available } = req.query;
+  const filter = {};
+  if (req.branchId) filter.branchId = req.branchId;
+  if (category) filter.category = category;
+  if (available !== undefined) filter.isAvailable = available === 'true';
+  if (search) filter.name = { $regex: search, $options: 'i' };
+
+  const cacheKey = `menus:${req.branchId || 'all'}:${category || 'all'}:${available ?? 'all'}:${search || ''}`;
+  const cached = getCache(cacheKey);
+  if (cached) {
+    return res.json(cached);
+  }
+
+  const items = await MenuItem.find(filter).sort({ name: 1 });
+  setCache(cacheKey, items, 10 * 60 * 1000);
+  return res.json(items);
+};
+
+const getMenuItem = async (req, res) => {
+  const item = await MenuItem.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
+  if (!item) {
+    return res.status(404).json({ message: 'Menu item not found' });
+  }
+  return res.json(item);
+};
+
+const createMenuItem = async (req, res) => {
+  try {
+    const item = await MenuItem.create({ ...req.body, branchId: req.branchId });
+    clearCachePrefix(`menus:${req.branchId || 'all'}:`);
+    return res.status(201).json(item);
+  } catch (error) {
+    return res.status(500).json({ message: 'Create menu item failed', error: error.message });
+  }
+};
+
+const updateMenuItem = async (req, res) => {
+  try {
+    const item = await MenuItem.findOneAndUpdate(
+      { _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) },
+      req.body,
+      { new: true }
+    );
+    if (!item) {
+      return res.status(404).json({ message: 'Menu item not found' });
+    }
+    clearCachePrefix(`menus:${req.branchId || 'all'}:`);
+    return res.json(item);
+  } catch (error) {
+    return res.status(500).json({ message: 'Update menu item failed', error: error.message });
+  }
+};
+
+const deleteMenuItem = async (req, res) => {
+  const item = await MenuItem.findOneAndDelete({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
+  if (!item) {
+    return res.status(404).json({ message: 'Menu item not found' });
+  }
+  clearCachePrefix(`menus:${req.branchId || 'all'}:`);
+  return res.json({ message: 'Menu item deleted' });
+};
+
+module.exports = { listMenu, getMenuItem, createMenuItem, updateMenuItem, deleteMenuItem };

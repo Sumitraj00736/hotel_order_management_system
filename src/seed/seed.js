@@ -1,11 +1,11 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const User = require('../models/User');
-const Table = require('../models/Table');
-const MenuItem = require('../models/MenuItem');
-const Ingredient = require('../models/Ingredient');
-const Recipe = require('../models/Recipe');
+const User = require('../models/users/User');
+const Table = require('../models/tables/Table');
+const MenuItem = require('../models/menu/MenuItem');
+const Ingredient = require('../models/inventory/Ingredient');
+const Recipe = require('../models/menu/Recipe');
 const menuItems = require('./menuItems');
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/hotel_order';

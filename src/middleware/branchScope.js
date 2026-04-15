@@ -1,5 +1,5 @@
-const UserBranchRole = require('../models/UserBranchRole');
-const Branch = require('../models/Branch');
+const UserBranchRole = require('../models/users/UserBranchRole');
+const Branch = require('../models/core/Branch');
 
 // Attaches branchId and branchRole to req based on header x-branch-id and user membership
 const branchScope = async (req, res, next) => {
