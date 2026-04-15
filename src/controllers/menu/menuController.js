@@ -1,6 +1,53 @@
 const MenuItem = require('../../models/menu/MenuItem');
 const { getCache, setCache, clearCachePrefix } = require('../../utils/cache');
 
+const normalizeVariants = (variants = []) =>
+  (Array.isArray(variants) ? variants : [])
+    .map((variant) => {
+      const name = String(variant?.name || '').trim();
+      if (!name) return null;
+      const actualPrice = Number(variant?.actualPrice ?? variant?.price ?? 0);
+      const discount = Number(variant?.discount ?? 0);
+      const listedPrice = Math.max(actualPrice - discount, 0);
+      return {
+        name,
+        type: variant?.type || 'Other',
+        actualPrice,
+        discount,
+        price: listedPrice
+      };
+    })
+    .filter(Boolean);
+
+const buildMenuPayload = (body, branchId, { isUpdate = false } = {}) => {
+  const payload = { ...body, branchId };
+  const hasVariantPayload = Object.prototype.hasOwnProperty.call(body, 'variants');
+  const hasPricePayload = Object.prototype.hasOwnProperty.call(body, 'price');
+  const hasMaxPricePayload = Object.prototype.hasOwnProperty.call(body, 'maxPrice');
+
+  if (!isUpdate || hasVariantPayload) {
+    const variants = normalizeVariants(body.variants);
+    payload.variants = variants;
+
+    if (variants.length > 0) {
+      const variantPrices = variants.map((variant) => Number(variant.price) || 0);
+      payload.price = Math.min(...variantPrices);
+      payload.maxPrice = Math.max(...variantPrices);
+      return payload;
+    }
+  }
+
+  if (!isUpdate || hasPricePayload) {
+    payload.price = Number(body.price) || 0;
+  }
+
+  if (!isUpdate || hasMaxPricePayload) {
+    const nextMax = Number(body.maxPrice) || 0;
+    payload.maxPrice = nextMax > (Number(payload.price) || 0) ? nextMax : undefined;
+  }
+  return payload;
+};
+
 const listMenu = async (req, res) => {
   const { search, category, available } = req.query;
   const filter = {};
@@ -30,7 +77,8 @@ const getMenuItem = async (req, res) => {
 
 const createMenuItem = async (req, res) => {
   try {
-    const item = await MenuItem.create({ ...req.body, branchId: req.branchId });
+    const payload = buildMenuPayload(req.body, req.branchId);
+    const item = await MenuItem.create(payload);
     clearCachePrefix(`menus:${req.branchId || 'all'}:`);
     return res.status(201).json(item);
   } catch (error) {
@@ -40,9 +88,10 @@ const createMenuItem = async (req, res) => {
 
 const updateMenuItem = async (req, res) => {
   try {
+    const payload = buildMenuPayload(req.body, req.branchId, { isUpdate: true });
     const item = await MenuItem.findOneAndUpdate(
       { _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) },
-      req.body,
+      payload,
       { new: true }
     );
     if (!item) {

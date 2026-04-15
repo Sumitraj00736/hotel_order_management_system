@@ -2,7 +2,10 @@ const mongoose = require('mongoose');
 
 const variantSchema = new mongoose.Schema(
   {
+    type: { type: String, enum: ['Veg', 'Non-Veg', 'Vegan', 'Other'], default: 'Other' },
     name: { type: String, trim: true, required: true },
+    actualPrice: { type: Number, required: true, min: 0, default: 0 },
+    discount: { type: Number, min: 0, default: 0 },
     price: { type: Number, required: true, min: 0 }
   },
   { _id: true }

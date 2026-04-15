@@ -28,7 +28,10 @@ router.post(
     body('addOns').optional().isArray(),
     body('imageUrl').optional().isURL(),
     body('variants').optional().isArray(),
+    body('variants.*.type').optional().isIn(['Veg', 'Non-Veg', 'Vegan', 'Other']),
     body('variants.*.name').optional().isString(),
+    body('variants.*.actualPrice').optional().isFloat({ min: 0 }),
+    body('variants.*.discount').optional().isFloat({ min: 0 }),
     body('variants.*.price').optional().isFloat({ min: 0 })
   ],
   validate,
@@ -49,7 +52,10 @@ router.put(
     body('addOns').optional().isArray(),
     body('imageUrl').optional().isURL(),
     body('variants').optional().isArray(),
+    body('variants.*.type').optional().isIn(['Veg', 'Non-Veg', 'Vegan', 'Other']),
     body('variants.*.name').optional().isString(),
+    body('variants.*.actualPrice').optional().isFloat({ min: 0 }),
+    body('variants.*.discount').optional().isFloat({ min: 0 }),
     body('variants.*.price').optional().isFloat({ min: 0 })
   ],
   validate,

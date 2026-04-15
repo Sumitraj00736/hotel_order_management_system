@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const ingredientSchema = new mongoose.Schema(
   {
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
-    name: { type: String, required: true, unique: true, trim: true },
+    name: { type: String, required: true, trim: true },
     unit: { type: String, required: true, trim: true }, // e.g., kg, g, ml, pcs
     currentStock: { type: Number, required: true, min: 0, default: 0 },
     initialStock: { type: Number, min: 0, default: 0 },
@@ -13,5 +13,7 @@ const ingredientSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+ingredientSchema.index({ branchId: 1, name: 1 }, { unique: true });
 
 module.exports = mongoose.model('Ingredient', ingredientSchema);
