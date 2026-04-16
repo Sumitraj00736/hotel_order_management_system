@@ -74,7 +74,7 @@ const dashboardSnapshot = async (req, res) => {
           .limit(50)
       : Promise.resolve([]);
 
-    const menusCacheKey = `menus:${branchId || 'all'}:all:all:`;
+    const menusCacheKey = `menus_v2:${branchId || 'all'}:all:all:`;
     const cachedMenus = getCache(menusCacheKey);
 
     const membershipsPromise = branchId
@@ -101,7 +101,11 @@ const dashboardSnapshot = async (req, res) => {
     ] = await Promise.all([
       membershipsPromise,
       Table.find(branchId ? { branchId } : {}).sort({ tableNumber: 1 }),
-      cachedMenus || MenuItem.find(branchId ? { branchId } : {}).sort({ name: 1 }),
+      cachedMenus || 
+      MenuItem.find(branchId ? { branchId } : {})
+        .populate('category', 'name')
+        .populate('subMenu', 'name')
+        .sort({ name: 1 }),
       ordersQuery,
       summaryPromise,
       overviewPromise,

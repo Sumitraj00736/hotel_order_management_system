@@ -56,19 +56,24 @@ const listMenu = async (req, res) => {
   if (available !== undefined) filter.isAvailable = available === 'true';
   if (search) filter.name = { $regex: search, $options: 'i' };
 
-  const cacheKey = `menus:${req.branchId || 'all'}:${category || 'all'}:${available ?? 'all'}:${search || ''}`;
+  const cacheKey = `menus_v2:${req.branchId || 'all'}:${category || 'all'}:${available ?? 'all'}:${search || ''}`;
   const cached = getCache(cacheKey);
   if (cached) {
     return res.json(cached);
   }
 
-  const items = await MenuItem.find(filter).sort({ name: 1 });
+  const items = await MenuItem.find(filter)
+    .populate('category', 'name')
+    .populate('subMenu', 'name')
+    .sort({ name: 1 });
   setCache(cacheKey, items, 10 * 60 * 1000);
   return res.json(items);
 };
 
 const getMenuItem = async (req, res) => {
-  const item = await MenuItem.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
+  const item = await MenuItem.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })
+    .populate('category', 'name')
+    .populate('subMenu', 'name');
   if (!item) {
     return res.status(404).json({ message: 'Menu item not found' });
   }

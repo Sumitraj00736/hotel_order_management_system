@@ -169,11 +169,13 @@ const listOrders = async (req, res) => {
     }
   } else if (req.query.category) {
     if (req.query.category === 'active') {
-      filter.status = { $nin: ['paid', 'cancelled'] };
+      filter.status = 'pending';
     } else if (req.query.category === 'paid') {
       filter.status = 'paid';
     } else if (req.query.category === 'cancelled') {
       filter.status = 'cancelled';
+    } else if (req.query.category === 'all') {
+      // No status filter for 'all'
     }
   }
   if (req.query.dateFrom || req.query.dateTo) {
@@ -206,13 +208,18 @@ const listOrders = async (req, res) => {
   }
 
   const orders = await query;
+  const total = paginate && limit > 0 ? await Order.countDocuments(filter) : orders.length;
 
-  if (paginate && limit > 0) {
-    const total = await Order.countDocuments(filter);
-    return res.json({ data: orders, page, limit, total });
-  }
-
-  return res.json(orders);
+  return res.json({
+    success: true,
+    data: orders,
+    pagination: paginate && limit > 0 ? {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    } : null
+  });
 };
 
 const getOrder = async (req, res) => {
