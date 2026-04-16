@@ -39,7 +39,7 @@ const orderSchema = new mongoose.Schema(
     paymentStatus: { type: String, enum: ['unpaid', 'partial', 'paid', 'credit'], default: 'unpaid' },
     status: {
       type: String,
-      enum: ['pending', 'preparing', 'ready', 'served', 'paid'],
+      enum: ['pending', 'preparing', 'ready', 'served', 'paid', 'cancelled'],
       default: 'pending'
     },
     spiceLevel: { type: String, enum: ['mild', 'medium', 'spicy', 'extra_spicy'], default: 'medium' },

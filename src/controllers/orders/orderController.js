@@ -162,7 +162,19 @@ const listOrders = async (req, res) => {
   const filter = {};
   if (req.branchId) filter.branchId = req.branchId;
   if (req.query.status) {
-    filter.status = req.query.status;
+    if (typeof req.query.status === 'string' && req.query.status.includes(',')) {
+      filter.status = { $in: req.query.status.split(',') };
+    } else {
+      filter.status = req.query.status;
+    }
+  } else if (req.query.category) {
+    if (req.query.category === 'active') {
+      filter.status = { $nin: ['paid', 'cancelled'] };
+    } else if (req.query.category === 'paid') {
+      filter.status = 'paid';
+    } else if (req.query.category === 'cancelled') {
+      filter.status = 'cancelled';
+    }
   }
   if (req.query.dateFrom || req.query.dateTo) {
     filter.createdAt = {};
@@ -512,7 +524,7 @@ const updateOrder = async (req, res) => {
 
     await order.save({ session });
 
-    if (order.status === 'paid') {
+    if (order.status === 'paid' || order.status === 'cancelled') {
       await Table.findByIdAndUpdate(order.table, { status: 'available' });
     }
 
@@ -600,7 +612,7 @@ const updateOrderStatus = async (req, res) => {
     order.editLogs.push({ editedBy: req.user._id, changes: `status -> ${req.body.status}` });
     await order.save({ session });
 
-    if (order.status === 'paid') {
+    if (order.status === 'paid' || order.status === 'cancelled') {
       await Table.findByIdAndUpdate(order.table, { status: 'available' }, { session });
     }
 
