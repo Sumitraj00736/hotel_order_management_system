@@ -1,5 +1,5 @@
 const { Server } = require('socket.io');
-const { attachSocket } = require('../../utils/socket');
+const { attachSocket } = require('../../utils/realtime/socket');
 
 const createSocketServer = (server) => {
   const io = new Server(server, {
