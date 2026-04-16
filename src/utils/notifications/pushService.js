@@ -71,7 +71,23 @@ const sendPushToRole = async ({ branchId, role, title, body, data }) => {
   }).lean();
   const tokens = subscriptions.map((sub) => sub.fcmToken).filter(Boolean);
   const payload = {
-    notification: { title: title || 'Notification', body: body || '' },
+    notification: { 
+      title: title || 'Notification', 
+      body: body || '',
+    },
+    android: {
+      notification: {
+        sound: 'default',
+        priority: 'high'
+      }
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: 'default'
+        }
+      }
+    },
     data: normalizeData(data)
   };
   await sendToTokens(tokens, payload);
@@ -87,7 +103,23 @@ const sendPushToUser = async ({ userId, title, body, data }) => {
   }).lean();
   const tokens = subscriptions.map((sub) => sub.fcmToken).filter(Boolean);
   const payload = {
-    notification: { title: title || 'Notification', body: body || '' },
+    notification: { 
+      title: title || 'Notification', 
+      body: body || '',
+    },
+    android: {
+      notification: {
+        sound: 'default',
+        priority: 'high'
+      }
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: 'default'
+        }
+      }
+    },
     data: normalizeData(data)
   };
   await sendToTokens(tokens, payload);

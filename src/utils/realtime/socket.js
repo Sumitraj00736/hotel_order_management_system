@@ -19,6 +19,7 @@ const emitNewOrder = (order) => {
     const branchRoom = order.branchId ? `:branch:${order.branchId}` : '';
     ioInstance.to(`role:kitchen${branchRoom}`).emit('orders:new', order);
     ioInstance.to(`role:admin${branchRoom}`).emit('orders:new', order);
+    ioInstance.to(`role:superadmin${branchRoom}`).emit('orders:new', order);
     ioInstance.to(`role:waiter${branchRoom}`).emit('orders:new', order);
   }
 };
@@ -28,6 +29,7 @@ const emitOrderUpdate = (order) => {
     const branchRoom = order.branchId ? `:branch:${order.branchId}` : '';
     ioInstance.to(`role:kitchen${branchRoom}`).emit('orders:update', order);
     ioInstance.to(`role:admin${branchRoom}`).emit('orders:update', order);
+    ioInstance.to(`role:superadmin${branchRoom}`).emit('orders:update', order);
     ioInstance.to(`role:waiter${branchRoom}`).emit('orders:update', order);
   }
 };
@@ -43,6 +45,7 @@ const emitTableUpdate = (table) => {
   if (ioInstance) {
     const branchRoom = table.branchId ? `:branch:${table.branchId}` : '';
     ioInstance.to(`role:admin${branchRoom}`).emit('tables:update', table);
+    ioInstance.to(`role:superadmin${branchRoom}`).emit('tables:update', table);
     ioInstance.to(`role:waiter${branchRoom}`).emit('tables:update', table);
   }
 };
