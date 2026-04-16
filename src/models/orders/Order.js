@@ -47,7 +47,7 @@ const orderSchema = new mongoose.Schema(
     kitchenAssigned: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     kitchenAssignedAt: { type: Date },
     assignedStaff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    paymentMethod: { type: String, enum: ['cash', 'fonepay', 'card', 'bank'] },
+    paymentMethod: { type: String, enum: ['cash', 'fonepay', 'card', 'bank', 'upi', 'wallet', 'online', 'other'] },
     paymentRemark: { type: String },
     paidAt: { type: Date },
     paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

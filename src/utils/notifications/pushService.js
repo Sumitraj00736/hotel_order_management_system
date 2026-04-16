@@ -42,7 +42,7 @@ const sendToTokens = async (tokens, payload) => {
   const app = initFirebase();
   if (!app) return;
   const messaging = admin.messaging(app);
-  const response = await messaging.sendEachForMulticast(payload);
+  const response = await messaging.sendEachForMulticast({ ...payload, tokens });
   const invalidTokens = [];
   response.responses.forEach((res, idx) => {
     if (!res.success) {
