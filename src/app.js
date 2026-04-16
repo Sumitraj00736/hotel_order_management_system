@@ -16,9 +16,13 @@ app.use(compression());
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300,
+    max: 1000, // Increased from 300 to 1000
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    skip: (req) => {
+      const skipRoutes = ['/api/push', '/api/notifications'];
+      return skipRoutes.some(route => req.originalUrl.startsWith(route));
+    }
   })
 );
 app.use(express.json());
