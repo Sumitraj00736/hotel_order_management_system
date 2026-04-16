@@ -17,7 +17,9 @@ const orderItemSchema = new mongoose.Schema(
 const orderSchema = new mongoose.Schema(
   {
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
-    table: { type: mongoose.Schema.Types.ObjectId, ref: 'Table', required: true },
+    table: { type: mongoose.Schema.Types.ObjectId, ref: 'Table' },
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
+    staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     items: { type: [orderItemSchema], required: true },
     totalAmount: { type: Number, required: true, min: 0 },
     subTotal: { type: Number, min: 0 },
@@ -34,7 +36,7 @@ const orderSchema = new mongoose.Schema(
     changeDue: { type: Number, min: 0, default: 0 },
     invoiceNo: { type: String, trim: true },
     kotNo: { type: String, trim: true },
-    orderType: { type: String, enum: ['dine_in', 'takeaway', 'delivery', 'online'], default: 'dine_in' },
+    orderType: { type: String, enum: ['dine_in', 'takeaway', 'delivery', 'online', 'staff'], default: 'dine_in' },
     customerName: { type: String, trim: true },
     paymentStatus: { type: String, enum: ['unpaid', 'partial', 'paid', 'credit'], default: 'unpaid' },
     status: {

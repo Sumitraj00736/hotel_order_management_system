@@ -42,17 +42,22 @@ const sendToTokens = async (tokens, payload) => {
   const app = initFirebase();
   if (!app) return;
   const messaging = admin.messaging(app);
-  const response = await messaging.sendEachForMulticast({ ...payload, tokens });
-  const invalidTokens = [];
-  response.responses.forEach((res, idx) => {
-    if (!res.success) {
-      const code = res.error?.code;
-      if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
-        invalidTokens.push(tokens[idx]);
+  try {
+    const response = await messaging.sendEachForMulticast({ ...payload, tokens });
+    console.log(`[PushService] Sent to ${tokens.length} tokens. Success: ${response.successCount}, Failure: ${response.failureCount}`);
+    const invalidTokens = [];
+    response.responses.forEach((res, idx) => {
+      if (!res.success) {
+        const code = res.error?.code;
+        if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
+          invalidTokens.push(tokens[idx]);
+        }
       }
-    }
-  });
-  await disableTokens(invalidTokens);
+    });
+    await disableTokens(invalidTokens);
+  } catch (err) {
+    console.error('[PushService] Batch send failed:', err);
+  }
 };
 
 const sendPushToRole = async ({ branchId, role, title, body, data }) => {

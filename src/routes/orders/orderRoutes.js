@@ -17,7 +17,7 @@ router.post(
   '/',
   requirePermission('orders:edit'),
   [
-    body('table').notEmpty(),
+    body('table').optional({ checkFalsy: true }).isMongoId(),
     body('items').isArray({ min: 1 }),
     body('items.*.menuItem').notEmpty(),
     body('items.*.quantity').isInt({ min: 1 }),
@@ -26,7 +26,9 @@ router.post(
     body('items.*.variantName').optional().isString(),
     body('items.*.variantPrice').optional().isFloat({ min: 0 }),
     body('items.*.itemNote').optional().isString().isLength({ max: 500 }),
-    body('assignedStaff').optional().isMongoId(),
+    body('orderType').optional().isIn(['dine_in', 'takeaway', 'delivery', 'online', 'staff']),
+    body('customerId').optional({ checkFalsy: true }).isMongoId(),
+    body('staffId').optional({ checkFalsy: true }).isMongoId(),
     body('customerName').optional().isString().isLength({ max: 200 }),
     body('spiceLevel').optional().isIn(['mild', 'medium', 'spicy', 'extra_spicy']),
     body('specialInstructions').optional().isString().isLength({ max: 500 })

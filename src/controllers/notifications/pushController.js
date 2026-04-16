@@ -87,7 +87,7 @@ const status = async (req, res) => {
   }
   const doc = await PushSubscription.findOne({ userId: req.user._id, deviceId, provider: 'fcm' });
   if (!doc) return res.json({ exists: false, enabled: false });
-  return res.json({ exists: true, enabled: doc.enabled });
+  return res.json({ exists: true, enabled: doc.enabled, fcmToken: doc.fcmToken });
 };
 
 const testPush = async (req, res) => {

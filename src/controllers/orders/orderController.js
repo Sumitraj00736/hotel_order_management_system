@@ -245,16 +245,19 @@ const createOrder = async (req, res) => {
     session.startTransaction();
 
     const { table, items, spiceLevel, specialInstructions } = req.body;
-    const tableDoc = await Table.findOne({ _id: table, ...(req.branchId ? { branchId: req.branchId } : {}) }).session(session);
-    if (!tableDoc) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({ message: 'Table not found' });
-    }
-    if (tableDoc.status === 'occupied') {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ message: 'Table already occupied' });
+    let tableDoc = null;
+    if (table) {
+      tableDoc = await Table.findOne({ _id: table, ...(req.branchId ? { branchId: req.branchId } : {}) }).session(session);
+      if (!tableDoc) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(404).json({ message: 'Table not found' });
+      }
+      if (tableDoc.status === 'occupied') {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ message: 'Table already occupied' });
+      }
     }
 
     const { orderItems, totalAmount } = await buildOrderItems(items, req.branchId);
@@ -263,7 +266,9 @@ const createOrder = async (req, res) => {
     const [order] = await Order.create(
       [
         {
-          table,
+          table: table || undefined,
+          customerId: req.body.customerId || undefined,
+          staffId: req.body.staffId || undefined,
           items: orderItems,
           totalAmount,
           subTotal: totalAmount,
@@ -283,9 +288,11 @@ const createOrder = async (req, res) => {
       { session }
     );
 
-    tableDoc.status = 'occupied';
-    await tableDoc.save({ session });
-    emitTableUpdate(tableDoc);
+    if (tableDoc) {
+      tableDoc.status = 'occupied';
+      await tableDoc.save({ session });
+      emitTableUpdate(tableDoc);
+    }
 
     await consumeInventory(orderItems, order._id, req.user?._id, session);
 
@@ -302,11 +309,16 @@ const createOrder = async (req, res) => {
       .populate('editLogs.editedBy', 'name email role');
 
     emitNewOrder(populated);
+    const targetLabel = populated.table ? `table ${populated.table.tableNumber}` : `${populated.orderType} order`;
+    const activityDesc = populated.table 
+      ? `${populated.createdBy?.name || 'Staff'} created table order for Table ${populated.table.tableNumber}`
+      : `${populated.createdBy?.name || 'Staff'} created ${populated.orderType} order for ${populated.customerName || 'Customer'}`;
+
     await notifyRole({
       role: 'kitchen',
       type: 'order:new',
       category: 'order',
-      message: `New order for table ${populated.table?.tableNumber}`,
+      message: `New order for ${targetLabel}`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,
       branchId: req.branchId
@@ -315,7 +327,7 @@ const createOrder = async (req, res) => {
       role: 'admin',
       type: 'order:new',
       category: 'order',
-      message: `${populated.createdBy?.name || 'Waiter'} booked table ${populated.table?.tableNumber}`,
+      message: `${populated.createdBy?.name || 'Waiter'} booked ${targetLabel}`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,
       branchId: req.branchId
@@ -324,7 +336,7 @@ const createOrder = async (req, res) => {
       role: 'superadmin',
       type: 'order:new',
       category: 'order',
-      message: `${populated.createdBy?.name || 'Waiter'} booked table ${populated.table?.tableNumber}`,
+      message: `${populated.createdBy?.name || 'Waiter'} booked ${targetLabel}`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,
       branchId: req.branchId
@@ -333,7 +345,7 @@ const createOrder = async (req, res) => {
       role: 'waiter',
       type: 'order:new',
       category: 'order',
-      message: `${populated.createdBy?.name || 'Waiter'} booked table ${populated.table?.tableNumber}`,
+      message: `${populated.createdBy?.name || 'Waiter'} booked ${targetLabel}`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,
       branchId: req.branchId
@@ -343,7 +355,7 @@ const createOrder = async (req, res) => {
       userId: populated.createdBy?._id,
       type: 'order:new',
       category: 'order',
-      message: `You placed an order for table ${populated.table?.tableNumber}`,
+      message: `You placed an order for ${targetLabel}`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,
       branchId: req.branchId
@@ -352,7 +364,7 @@ const createOrder = async (req, res) => {
       branchId: req.branchId,
       title: 'Order created',
       type: 'Order Created',
-      description: `${populated.createdBy?.name || 'Staff'} created table order for Table ${populated.table?.tableNumber}`,
+      description: activityDesc,
       performedBy: req.user?._id
     });
     return res.status(201).json(populated);
