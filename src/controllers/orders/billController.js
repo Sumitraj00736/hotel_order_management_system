@@ -125,13 +125,15 @@ const payBill = async (req, res) => {
     if (customerName) order.customerName = customerName;
     await order.save();
 
-    const updatedTable = await Table.findOneAndUpdate(
-      { _id: order.table._id, ...(req.branchId ? { branchId: req.branchId } : {}) },
-      { status: 'available' },
-      { new: true }
-    );
-    if (updatedTable) {
-      emitTableUpdate(updatedTable);
+    if (order.table && order.table._id) {
+      const updatedTable = await Table.findOneAndUpdate(
+        { _id: order.table._id, ...(req.branchId ? { branchId: req.branchId } : {}) },
+        { status: 'available' },
+        { new: true }
+      );
+      if (updatedTable) {
+        emitTableUpdate(updatedTable);
+      }
     }
 
     const existingHistory = await CustomerHistory.findOne({ orderId: order._id });
