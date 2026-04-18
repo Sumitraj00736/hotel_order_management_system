@@ -4,9 +4,9 @@ const User = require('../../models/users/User');
 const Branch = require('../../models/core/Branch');
 const Organization = require('../../models/core/Organization');
 const UserBranchRole = require('../../models/users/UserBranchRole');
-const { slugify } = require('../../utils/slugify');
-const { logActivity } = require('../../utils/activity');
-const { resolveRolePermissions } = require('../../utils/permissions');
+const { slugify } = require('../../utils/common/slugify');
+const { logActivity } = require('../../utils/notifications/activity');
+const { resolveRolePermissions } = require('../../utils/auth/permissions');
 
 const createToken = (user) => {
   if (!process.env.JWT_SECRET) {

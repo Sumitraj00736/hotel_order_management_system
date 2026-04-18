@@ -1,5 +1,5 @@
 const MenuItem = require('../../models/menu/MenuItem');
-const { getCache, setCache, clearCachePrefix } = require('../../utils/cache');
+const { getCache, setCache, clearCachePrefix } = require('../../utils/performance/cache');
 
 const normalizeVariants = (variants = []) =>
   (Array.isArray(variants) ? variants : [])
@@ -84,6 +84,9 @@ const createMenuItem = async (req, res) => {
   try {
     const payload = buildMenuPayload(req.body, req.branchId);
     const item = await MenuItem.create(payload);
+    // listMenu uses `menus_v2:*` cache keys; clear the matching prefix so edits reflect immediately.
+    clearCachePrefix(`menus_v2:${req.branchId || 'all'}:`);
+    // Backward-compat (older cache key prefixes, if any)
     clearCachePrefix(`menus:${req.branchId || 'all'}:`);
     return res.status(201).json(item);
   } catch (error) {
@@ -102,6 +105,7 @@ const updateMenuItem = async (req, res) => {
     if (!item) {
       return res.status(404).json({ message: 'Menu item not found' });
     }
+    clearCachePrefix(`menus_v2:${req.branchId || 'all'}:`);
     clearCachePrefix(`menus:${req.branchId || 'all'}:`);
     return res.json(item);
   } catch (error) {
@@ -114,6 +118,7 @@ const deleteMenuItem = async (req, res) => {
   if (!item) {
     return res.status(404).json({ message: 'Menu item not found' });
   }
+  clearCachePrefix(`menus_v2:${req.branchId || 'all'}:`);
   clearCachePrefix(`menus:${req.branchId || 'all'}:`);
   return res.json({ message: 'Menu item deleted' });
 };

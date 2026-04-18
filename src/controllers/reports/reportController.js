@@ -3,7 +3,7 @@ const CustomerHistory = require('../../models/customers/CustomerHistory');
 const User = require('../../models/users/User');
 const Purchase = require('../../models/finance/Purchase');
 const Expense = require('../../models/finance/Expense');
-const { getCache, setCache } = require('../../utils/cache');
+const { getCache, setCache } = require('../../utils/performance/cache');
 
 const buildSummaryData = async ({ branchId, dateFrom, dateTo }) => {
   const filter = {};

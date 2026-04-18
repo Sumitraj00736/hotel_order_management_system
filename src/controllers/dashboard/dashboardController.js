@@ -13,7 +13,7 @@ const Notification = require('../../models/notifications/Notification');
 const { buildSummaryData, buildOverviewData, buildAnalyticsData } = require('../reports/reportController');
 const { buildStockReport } = require('../reports/stockReportController');
 const { fetchHistory } = require('../reports/historyController');
-const { getCache, setCache } = require('../../utils/cache');
+const { getCache, setCache } = require('../../utils/performance/cache');
 
 const getStockRange = (fromQuery, toQuery) => {
   const now = new Date();

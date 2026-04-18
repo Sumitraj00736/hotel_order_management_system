@@ -1,4 +1,4 @@
-const { DEFAULT_ROLE_PERMISSIONS, normalizeRoleKey } = require('../utils/permissions');
+const { DEFAULT_ROLE_PERMISSIONS, normalizeRoleKey } = require('../utils/auth/permissions');
 
 const requirePermission = (...required) => (req, res, next) => {
   if (!req.user) {

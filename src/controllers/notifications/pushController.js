@@ -1,5 +1,5 @@
 const PushSubscription = require('../../models/notifications/PushSubscription');
-const { getPublicKey, isConfigured, sendPushToUser } = require('../../utils/pushService');
+const { getPublicKey, isConfigured, sendPushToUser } = require('../../utils/notifications/pushService');
 
 const getPublicKeyController = async (req, res) => {
   return res.json({ publicKey: getPublicKey() });

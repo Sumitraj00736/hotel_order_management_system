@@ -1,5 +1,5 @@
 const AddOn = require('../../models/menu/AddOn');
-const { getCache, setCache, clearCachePrefix } = require('../../utils/cache');
+const { getCache, setCache, clearCachePrefix } = require('../../utils/performance/cache');
 
 const listAddOns = async (req, res) => {
   const filter = {};

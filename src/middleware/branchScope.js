@@ -17,7 +17,7 @@ const branchScope = async (req, res, next) => {
     if (!fallbackBranch) {
       return res.status(403).json({ message: 'No branch memberships. Contact admin.' });
     }
-    const { resolveRolePermissions } = require('../utils/permissions');
+    const { resolveRolePermissions } = require('../utils/auth/permissions');
     await UserBranchRole.findOneAndUpdate(
       { userId: req.user._id, branchId: fallbackBranch._id },
       {

@@ -1,7 +1,7 @@
 const Table = require('../../models/tables/Table');
 const Order = require('../../models/orders/Order');
-const { emitTableUpdate } = require('../../utils/socket');
-const { notifyRole } = require('../../utils/notify');
+const { emitTableUpdate } = require('../../utils/realtime/socket');
+const { notifyRole } = require('../../utils/notifications/notify');
 
 const listTables = async (req, res) => {
   const filter = {};

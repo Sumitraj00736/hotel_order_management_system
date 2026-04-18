@@ -1,5 +1,5 @@
 const SubMenu = require('../../models/menu/SubMenu');
-const { getCache, setCache, clearCachePrefix } = require('../../utils/cache');
+const { getCache, setCache, clearCachePrefix } = require('../../utils/performance/cache');
 
 const listSubMenus = async (req, res) => {
   const filter = {};

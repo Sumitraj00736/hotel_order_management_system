@@ -1,10 +1,10 @@
 const Order = require('../../models/orders/Order');
 const Table = require('../../models/tables/Table');
 const CustomerHistory = require('../../models/customers/CustomerHistory');
-const { emitOrderUpdate, emitTableUpdate } = require('../../utils/socket');
-const { notifyRole, notifyUser } = require('../../utils/notify');
-const { logActivity } = require('../../utils/activity');
-const { nextSequence } = require('../../utils/counter');
+const { emitOrderUpdate, emitTableUpdate } = require('../../utils/realtime/socket');
+const { notifyRole, notifyUser } = require('../../utils/notifications/notify');
+const { logActivity } = require('../../utils/notifications/activity');
+const { nextSequence } = require('../../utils/common/counter');
 
 const generateBill = async (req, res) => {
   const order = await Order.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })

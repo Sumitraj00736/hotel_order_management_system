@@ -1,5 +1,5 @@
 const Category = require('../../models/menu/Category');
-const { getCache, setCache, clearCachePrefix } = require('../../utils/cache');
+const { getCache, setCache, clearCachePrefix } = require('../../utils/performance/cache');
 
 const listCategories = async (req, res) => {
   const filter = {};

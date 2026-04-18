@@ -1,6 +1,6 @@
 const Organization = require('../../models/core/Organization');
 const Branch = require('../../models/core/Branch');
-const { slugify } = require('../../utils/slugify');
+const { slugify } = require('../../utils/common/slugify');
 
 // ── Public: find cafe by slug ─────────────────────────────────────────────────
 const getCafeBySlug = async (req, res) => {

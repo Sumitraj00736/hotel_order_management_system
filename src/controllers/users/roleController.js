@@ -1,7 +1,7 @@
 const Role = require('../../models/users/Role');
 const UserBranchRole = require('../../models/users/UserBranchRole');
 const User = require('../../models/users/User');
-const { DEFAULT_ROLE_PERMISSIONS, sanitizeRolePermissions } = require('../../utils/permissions');
+const { DEFAULT_ROLE_PERMISSIONS, sanitizeRolePermissions } = require('../../utils/auth/permissions');
 
 const DEFAULT_ROLE_SEEDS = [
   { name: 'superadmin', key: 'superadmin', color: '#0f172a' },

@@ -5,8 +5,8 @@ const Branch = require('../../models/core/Branch');
 const Organization = require('../../models/core/Organization');
 const Role = require('../../models/users/Role');
 const DeletedUser = require('../../models/users/DeletedUser');
-const { logActivity } = require('../../utils/activity');
-const { resolveRolePermissions, normalizeRoleKey, sanitizeRolePermissions } = require('../../utils/permissions');
+const { logActivity } = require('../../utils/notifications/activity');
+const { resolveRolePermissions, normalizeRoleKey, sanitizeRolePermissions } = require('../../utils/auth/permissions');
 
 const resolveRolePayload = async ({ branchId, roleName, roleId }) => {
   if (roleId) {

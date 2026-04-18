@@ -1,6 +1,6 @@
 const Table = require('../../models/tables/Table');
-const { emitNewOrder, emitTableUpdate } = require('../../utils/socket');
-const { notifyRole } = require('../../utils/notify');
+const { emitNewOrder, emitTableUpdate } = require('../../utils/realtime/socket');
+const { notifyRole } = require('../../utils/notifications/notify');
 const { buildOrderItems, ensureInventoryAvailability, consumeInventory } = require('./orderController');
 const Order = require('../../models/orders/Order');
 

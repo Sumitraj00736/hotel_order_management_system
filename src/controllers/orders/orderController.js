@@ -5,10 +5,10 @@ const Ingredient = require('../../models/inventory/Ingredient');
 const Recipe = require('../../models/menu/Recipe');
 const StockTransaction = require('../../models/inventory/StockTransaction');
 const UserBranchRole = require('../../models/users/UserBranchRole');
-const { emitNewOrder, emitOrderUpdate, emitTableUpdate } = require('../../utils/socket');
-const { notifyRole, notifyUser } = require('../../utils/notify');
-const { logActivity } = require('../../utils/activity');
-const { nextSequence } = require('../../utils/counter');
+const { emitNewOrder, emitOrderUpdate, emitTableUpdate } = require('../../utils/realtime/socket');
+const { notifyRole, notifyUser } = require('../../utils/notifications/notify');
+const { logActivity } = require('../../utils/notifications/activity');
+const { nextSequence } = require('../../utils/common/counter');
 
 const buildOrderItems = async (items, branchId) => {
   const menuIds = items.map((item) => item.menuItem);
