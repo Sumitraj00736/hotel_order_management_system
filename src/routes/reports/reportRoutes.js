@@ -21,9 +21,9 @@ router.get('/overview', requirePermission('reports:view'), overviewReport);
 router.get('/analytics', requirePermission('reports:view'), analyticsReport);
 router.get('/history', requirePermission('reports:view'), listHistory);
 router.get('/stock', requirePermission('reports:view'), stockReport);
-router.get('/transactions', requirePermission('reports:view'), transactionHistory);
+router.get('/transactions', requirePermission('reports:view', 'billing:view'), transactionHistory);
 router.get('/order-dashboard', requirePermission('reports:view'), orderDashboard);
 router.get('/overview-dashboard', requirePermission('reports:view'), overviewDashboard);
-router.get('/finance-dashboard', requirePermission('reports:view'), financeDashboard);
+router.get('/finance-dashboard', requirePermission('reports:view', 'billing:view'), financeDashboard);
 
 module.exports = router;

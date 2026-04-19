@@ -23,7 +23,8 @@ router.post(
     body('direction').isIn(['in', 'out']),
     body('amount').isFloat({ min: 0 }),
     body('txnDate').optional().isISO8601(),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
+    body('entryType').optional().isIn(['normal', 'balance_transfer_in', 'balance_transfer_out']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
     body('partyType').optional().isIn(['customer', 'staff', 'supplier', 'other']),
     body('attachments').optional().isArray()
@@ -39,7 +40,8 @@ router.put(
     body('direction').optional().isIn(['in', 'out']),
     body('amount').optional().isFloat({ min: 0 }),
     body('txnDate').optional().isISO8601(),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
+    body('entryType').optional().isIn(['normal', 'balance_transfer_in', 'balance_transfer_out']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
     body('partyType').optional().isIn(['customer', 'staff', 'supplier', 'other']),
     body('attachments').optional().isArray()

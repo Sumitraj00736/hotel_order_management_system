@@ -23,7 +23,7 @@ router.post(
     body('txnDate').optional().isISO8601(),
     body('totalAmount').optional().isFloat({ min: 0 }),
     body('netAmount').optional().isFloat({ min: 0 }),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
     body('items').optional().isArray(),
     body('attachments').optional().isArray()
@@ -39,7 +39,7 @@ router.put(
     body('txnDate').optional().isISO8601(),
     body('totalAmount').optional().isFloat({ min: 0 }),
     body('netAmount').optional().isFloat({ min: 0 }),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
     body('items').optional().isArray(),
     body('attachments').optional().isArray()

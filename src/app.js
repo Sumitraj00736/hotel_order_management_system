@@ -8,6 +8,11 @@ const compression = require('compression');
 const { buildCorsOptions } = require('./config/http/cors');
 const { registerApiRoutes } = require('./routes');
 
+// Ensure future finance collections are registered with Mongoose (scalable schemas).
+require('./models/finance/JournalVoucher');
+require('./models/finance/CashBankAccount');
+require('./models/finance/DaybookSession');
+
 const app = express();
 
 app.use(cors(buildCorsOptions()));

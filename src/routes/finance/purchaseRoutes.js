@@ -17,7 +17,7 @@ router.post(
   [
     body('amount').isFloat({ min: 0 }),
     body('billDate').optional().isISO8601(),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
     body('paidAt').optional().isISO8601(),
     body('items').optional().isArray(),
@@ -33,7 +33,7 @@ router.put(
     param('id').isMongoId(),
     body('amount').optional().isFloat({ min: 0 }),
     body('billDate').optional().isISO8601(),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
     body('paidAt').optional().isISO8601(),
     body('items').optional().isArray(),

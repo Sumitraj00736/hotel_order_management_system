@@ -19,7 +19,7 @@ router.post(
     body('accountHead').optional().isString(),
     body('partyType').optional().isIn(['customer', 'staff', 'supplier', 'other']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
     body('txnDate').optional().isISO8601()
   ],
   validate,
@@ -34,7 +34,7 @@ router.put(
     body('accountHead').optional().isString(),
     body('partyType').optional().isIn(['customer', 'staff', 'supplier', 'other']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
     body('txnDate').optional().isISO8601()
   ],
   validate,

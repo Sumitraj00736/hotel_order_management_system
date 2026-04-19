@@ -17,7 +17,7 @@ router.post(
   [
     body('title').notEmpty(),
     body('amount').isFloat({ min: 0 }),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
     body('paidAt').optional().isISO8601()
   ],
   validate,
@@ -30,7 +30,7 @@ router.put(
     param('id').isMongoId(),
     body('title').optional().notEmpty(),
     body('amount').optional().isFloat({ min: 0 }),
-    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
+    body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
     body('paidAt').optional().isISO8601()
   ],
   validate,

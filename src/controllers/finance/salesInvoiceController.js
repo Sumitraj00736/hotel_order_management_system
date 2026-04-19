@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const CustomerHistory = require('../../models/customers/CustomerHistory');
-const Order = require('../../models/orders/Order');
+const OrderModel = require('../../models/orders/Order');
 const Table = require('../../models/tables/Table');
 
 const orderTypeLabel = (ot) => {
@@ -34,7 +34,7 @@ const listSalesInvoices = async (req, res) => {
 
     const orderIds = rows.map((r) => r.orderId).filter(Boolean);
     const orders = orderIds.length
-      ? await Order.find({ _id: { $in: orderIds } })
+      ? await OrderModel.find({ _id: { $in: orderIds } })
           .select('orderType invoiceNo paymentMethod')
           .lean()
       : [];
@@ -82,7 +82,7 @@ const listSalesInvoices = async (req, res) => {
       { $match: filter },
       {
         $lookup: {
-          from: mongoose.model('Order').collection.name,
+          from: OrderModel.collection.name,
           localField: 'orderId',
           foreignField: '_id',
           as: 'ord'
