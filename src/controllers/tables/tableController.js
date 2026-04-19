@@ -6,8 +6,12 @@ const { notifyRole } = require('../../utils/notifications/notify');
 const listTables = async (req, res) => {
   const filter = {};
   if (req.branchId) filter.branchId = req.branchId;
+  if (req.query.includeTrashed !== 'true') {
+    filter.isTrashed = { $ne: true };
+  }
   const tables = await Table.find(filter)
     .populate('spaceId', 'name type')
+    .populate('tableTypeId', 'name active')
     .sort({ row: 1, column: 1, tableNumber: 1 });
   return res.json(tables);
 };
@@ -54,11 +58,16 @@ const updateTable = async (req, res) => {
 };
 
 const deleteTable = async (req, res) => {
-  const table = await Table.findOneAndDelete({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
+  // Soft-delete for RestroX-style "Move to trash"
+  const table = await Table.findOneAndUpdate(
+    { _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) },
+    { $set: { isTrashed: true } },
+    { new: true }
+  );
   if (!table) {
     return res.status(404).json({ message: 'Table not found' });
   }
-  return res.json({ message: 'Table deleted' });
+  return res.json({ message: 'Table moved to trash', table });
 };
 
 const freeTable = async (req, res) => {

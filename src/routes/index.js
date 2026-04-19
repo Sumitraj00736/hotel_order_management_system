@@ -13,6 +13,7 @@ const routeDefinitions = [
   { path: '/api/addons', router: require('./menu/addOnRoutes') },
   { path: '/api/combos', router: require('./menu/comboRoutes') },
   { path: '/api/tables', router: require('./tables/tableRoutes') },
+  { path: '/api/table-types', router: require('./tables/tableTypeRoutes') },
   { path: '/api/spaces', router: require('./tables/spaceRoutes') },
   { path: '/api/qr-codes', router: require('./tables/qrCodeRoutes') },
   { path: '/api/customers', router: require('./customers/customerRoutes') },

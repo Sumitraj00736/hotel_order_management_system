@@ -21,6 +21,7 @@ router.post(
     body('name').optional().isString(),
     body('type').optional().isString(),
     body('spaceId').optional().isMongoId(),
+    body('tableTypeId').optional().isMongoId(),
     body('capacity').optional().isInt({ min: 0 }),
     body('charge').optional().isFloat({ min: 0 }),
     body('row').optional().isInt({ min: 1 }),
@@ -37,10 +38,12 @@ router.put(
     body('name').optional().isString(),
     body('type').optional().isString(),
     body('spaceId').optional().isMongoId(),
+    body('tableTypeId').optional().isMongoId(),
     body('capacity').optional().isInt({ min: 0 }),
     body('charge').optional().isFloat({ min: 0 }),
     body('row').optional().isInt({ min: 1 }),
-    body('column').optional().isInt({ min: 1 })
+    body('column').optional().isInt({ min: 1 }),
+    body('isTrashed').optional().isBoolean()
   ],
   validate,
   updateTable
