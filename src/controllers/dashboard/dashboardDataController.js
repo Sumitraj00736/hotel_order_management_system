@@ -1,7 +1,12 @@
 const Order = require('../../models/orders/Order');
+const Table = require('../../models/tables/Table');
 const CustomerHistory = require('../../models/customers/CustomerHistory');
 const Purchase = require('../../models/finance/Purchase');
 const Expense = require('../../models/finance/Expense');
+const Income = require('../../models/finance/Income');
+const Payment = require('../../models/finance/Payment');
+const SalesReturn = require('../../models/finance/SalesReturn');
+const PurchaseReturn = require('../../models/finance/PurchaseReturn');
 const User = require('../../models/users/User');
 const Category = require('../../models/menu/Category');
 const AddOn = require('../../models/menu/AddOn');
@@ -20,24 +25,83 @@ const buildRangeMatch = (field, dateFrom, dateTo) => {
   return { [field]: range };
 };
 
+/** Max rows merged in memory per request — keeps pagination correct without unbounded RAM use. */
+const TRANSACTION_MERGE_CAP = 12000;
+
 const mapTransactionRows = async ({ branchId, dateFrom, dateTo, limit = 50, page = 1 }) => {
   const branchMatch = branchId ? { branchId } : {};
   const salesMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
   const purchaseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
   const expenseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
+  const incomeMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+  const paymentMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+  const salesReturnMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+  const purchaseReturnMatch = { ...branchMatch, ...buildRangeMatch('billDate', dateFrom, dateTo) };
 
-  const [sales, purchases, expenses, salesCount, purchaseCount, expenseCount] = await Promise.all([
-    CustomerHistory.find(salesMatch).sort({ paidAt: -1 }).limit(limit).lean(),
-    Purchase.find(purchaseMatch).sort({ paidAt: -1 }).limit(limit).lean(),
-    Expense.find(expenseMatch).sort({ paidAt: -1 }).limit(limit).lean(),
+  const [
+    sales,
+    purchases,
+    expenses,
+    incomes,
+    payments,
+    salesReturns,
+    purchaseReturns,
+    salesCount,
+    purchaseCount,
+    expenseCount,
+    incomeCount,
+    paymentCount,
+    salesReturnCount,
+    purchaseReturnCount
+  ] = await Promise.all([
+    CustomerHistory.find(salesMatch).sort({ paidAt: -1 }).lean(),
+    Purchase.find(purchaseMatch).sort({ paidAt: -1 }).lean(),
+    Expense.find(expenseMatch).sort({ paidAt: -1 }).lean(),
+    Income.find(incomeMatch).sort({ txnDate: -1 }).lean(),
+    Payment.find(paymentMatch).sort({ txnDate: -1 }).lean(),
+    SalesReturn.find(salesReturnMatch).sort({ txnDate: -1 }).lean(),
+    PurchaseReturn.find(purchaseReturnMatch).sort({ billDate: -1 }).lean(),
     CustomerHistory.countDocuments(salesMatch),
     Purchase.countDocuments(purchaseMatch),
-    Expense.countDocuments(expenseMatch)
+    Expense.countDocuments(expenseMatch),
+    Income.countDocuments(incomeMatch),
+    Payment.countDocuments(paymentMatch),
+    SalesReturn.countDocuments(salesReturnMatch),
+    PurchaseReturn.countDocuments(purchaseReturnMatch)
   ]);
+
+  const tableNums = [...new Set(sales.map((r) => r.tableNumber).filter((n) => n != null && n !== ''))];
+  let tableLabelMap = new Map();
+  if (branchId && tableNums.length) {
+    const tables = await Table.find({
+      branchId,
+      tableNumber: { $in: tableNums }
+    })
+      .select('tableNumber name type')
+      .lean();
+    tableLabelMap = new Map(
+      tables.map((t) => {
+        const label =
+          t.name && String(t.name).trim()
+            ? String(t.name).trim()
+            : `${String(t.type || 'table').replace(/_/g, ' ')} ${t.tableNumber}`;
+        return [t.tableNumber, label];
+      })
+    );
+  }
+
+  const particularForSale = (row) => {
+    if (row.tableNumber == null || row.tableNumber === '') return 'Walk-in / Sales';
+    return tableLabelMap.get(row.tableNumber) || `Table ${row.tableNumber}`;
+  };
 
   const userIds = [
     ...purchases.map((row) => row.createdBy).filter(Boolean),
-    ...expenses.map((row) => row.createdBy).filter(Boolean)
+    ...expenses.map((row) => row.createdBy).filter(Boolean),
+    ...incomes.map((row) => row.createdBy).filter(Boolean),
+    ...payments.map((row) => row.createdBy).filter(Boolean),
+    ...salesReturns.map((row) => row.createdBy).filter(Boolean),
+    ...purchaseReturns.map((row) => row.createdBy).filter(Boolean)
   ];
   const users = userIds.length ? await User.find({ _id: { $in: userIds } }).select('name') : [];
   const userMap = new Map(users.map((u) => [u._id.toString(), u.name]));
@@ -46,9 +110,9 @@ const mapTransactionRows = async ({ branchId, dateFrom, dateTo, limit = 50, page
     entryDate: row.createdAt,
     txnDate: row.paidAt,
     txnNo: row.invoiceNo || row.orderId?.toString() || '-',
-    particular: 'Sales',
-    txnType: 'Sale',
-    parties: row.customerName || 'Cash Customer',
+    particular: particularForSale(row),
+    txnType: 'Sales',
+    parties: row.customerName || '-',
     paymentMode: row.paymentMethod || '-',
     amount: row.finalAmount || row.totalAmount || 0,
     status: 'paid',
@@ -81,14 +145,90 @@ const mapTransactionRows = async ({ branchId, dateFrom, dateTo, limit = 50, page
     entryBy: row.createdBy ? userMap.get(row.createdBy.toString()) || 'System' : 'System'
   }));
 
-  const combined = [...salesRows, ...purchaseRows, ...expenseRows].sort((a, b) => new Date(b.txnDate) - new Date(a.txnDate));
+  const incomeRows = incomes.map((row) => ({
+    entryDate: row.createdAt,
+    txnDate: row.txnDate,
+    txnNo: row.referenceNo || row._id.toString(),
+    particular: row.accountHead || 'Income',
+    txnType: 'Income',
+    parties: row.partyName || row.partyType || '-',
+    paymentMode: row.paymentMethod || '-',
+    amount: row.amount || 0,
+    status: row.paymentStatus === 'unpaid_credit' ? 'unpaid' : 'paid',
+    entryBy: row.createdBy ? userMap.get(row.createdBy.toString()) || 'System' : 'System'
+  }));
+
+  const paymentRows = payments.map((row) => ({
+    entryDate: row.createdAt,
+    txnDate: row.txnDate,
+    txnNo: row.referenceNo || row._id.toString(),
+    particular: row.accountHead || (row.direction === 'in' ? 'Payment In' : 'Payment Out'),
+    txnType: row.direction === 'in' ? 'Payment In' : 'Payment Out',
+    parties: row.partyName || row.partyType || '-',
+    paymentMode: row.paymentMethod || '-',
+    amount: row.amount || 0,
+    status: row.paymentStatus === 'unpaid_credit' ? 'unpaid' : 'paid',
+    entryBy: row.createdBy ? userMap.get(row.createdBy.toString()) || 'System' : 'System'
+  }));
+
+  const salesReturnRows = salesReturns.map((row) => ({
+    entryDate: row.createdAt,
+    txnDate: row.txnDate,
+    txnNo: row.billReferenceNumber || row._id.toString(),
+    particular: 'Sales Return',
+    txnType: 'Sales Return',
+    parties: row.customerName || '-',
+    paymentMode: row.paymentMethod || '-',
+    amount: row.netAmount || row.totalAmount || 0,
+    status: row.paymentStatus === 'unpaid_credit' ? 'unpaid' : 'paid',
+    entryBy: row.createdBy ? userMap.get(row.createdBy.toString()) || 'System' : 'System'
+  }));
+
+  const purchaseReturnRows = purchaseReturns.map((row) => ({
+    entryDate: row.createdAt,
+    txnDate: row.billDate,
+    txnNo: row.billReferenceNumber || row._id.toString(),
+    particular: 'Purchase Return',
+    txnType: 'Purchase Return',
+    parties: row.supplierName || '-',
+    paymentMode: row.paymentMethod || '-',
+    amount: row.totalAmount || 0,
+    status: row.paymentStatus === 'unpaid_credit' ? 'unpaid' : 'paid',
+    entryBy: row.createdBy ? userMap.get(row.createdBy.toString()) || 'System' : 'System'
+  }));
+
+  const combined = [
+    ...salesRows,
+    ...purchaseRows,
+    ...expenseRows,
+    ...incomeRows,
+    ...paymentRows,
+    ...salesReturnRows,
+    ...purchaseReturnRows
+  ].sort((a, b) => new Date(b.txnDate) - new Date(a.txnDate));
+
+  const total =
+    salesCount +
+    purchaseCount +
+    expenseCount +
+    incomeCount +
+    paymentCount +
+    salesReturnCount +
+    purchaseReturnCount;
+
+  const capped = combined.length > TRANSACTION_MERGE_CAP ? combined.slice(0, TRANSACTION_MERGE_CAP) : combined;
+  const truncated = combined.length > TRANSACTION_MERGE_CAP;
+
   const start = (page - 1) * limit;
-  const paged = combined.slice(start, start + limit);
+  const paged = capped.slice(start, start + limit);
   return {
     data: paged,
-    total: salesCount + purchaseCount + expenseCount,
+    total,
     page,
-    limit
+    limit,
+    ...(truncated && {
+      warning: `Results capped at ${TRANSACTION_MERGE_CAP} rows; narrow date filters for full history.`
+    })
   };
 };
 
@@ -249,25 +389,50 @@ const overviewDashboard = async (req, res) => {
 const financeDashboard = async (req, res) => {
   try {
     const branchMatch = req.branchId ? { branchId: req.branchId } : {};
-    const [sales, purchases, expenses] = await Promise.all([
+    const { dateFrom, dateTo } = buildDateRange(req);
+
+    const salesMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
+    const purchaseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
+    const expenseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
+    const incomeMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+    const paymentMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+
+    const [sales, purchases, expenses, incomes, paymentInAgg, paymentOutAgg] = await Promise.all([
       CustomerHistory.aggregate([
-        { $match: branchMatch },
-        { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+        { $match: salesMatch },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: { $ifNull: ['$finalAmount', '$totalAmount'] } }
+          }
+        }
       ]),
-      Purchase.aggregate([{ $match: branchMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Expense.aggregate([{ $match: branchMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }])
+      Purchase.aggregate([{ $match: purchaseMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Expense.aggregate([{ $match: expenseMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Income.aggregate([{ $match: incomeMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Payment.aggregate([
+        { $match: { ...paymentMatch, direction: 'in' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Payment.aggregate([
+        { $match: { ...paymentMatch, direction: 'out' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } }
+      ])
     ]);
 
     const totalSales = sales[0]?.total || 0;
     const purchase = purchases[0]?.total || 0;
     const expense = expenses[0]?.total || 0;
+    const income = incomes[0]?.total || 0;
+    const paymentIn = paymentInAgg[0]?.total || 0;
+    const paymentOut = paymentOutAgg[0]?.total || 0;
 
     const salesSeries = await CustomerHistory.aggregate([
-      { $match: branchMatch },
+      { $match: salesMatch },
       {
         $group: {
           _id: { year: { $year: '$paidAt' }, month: { $month: '$paidAt' } },
-          sales: { $sum: '$totalAmount' }
+          sales: { $sum: { $ifNull: ['$finalAmount', '$totalAmount'] } }
         }
       },
       { $sort: { '_id.year': 1, '_id.month': 1 } }
@@ -281,10 +446,10 @@ const financeDashboard = async (req, res) => {
       kpis: {
         sales: totalSales,
         purchase,
-        income: totalSales,
+        income,
         expenses: expense,
-        paymentIn: totalSales,
-        paymentOut: purchase + expense
+        paymentIn,
+        paymentOut
       },
       salesSeries: formattedSalesSeries
     });

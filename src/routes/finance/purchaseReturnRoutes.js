@@ -4,44 +4,48 @@ const auth = require('../../middleware/auth');
 const branchScope = require('../../middleware/branchScope');
 const requirePermission = require('../../middleware/requirePermission');
 const validate = require('../../middleware/validate');
-const { listPurchases, createPurchase, updatePurchase, deletePurchase } = require('../../controllers/finance/purchaseController');
+const {
+  listPurchaseReturns,
+  createPurchaseReturn,
+  updatePurchaseReturn,
+  deletePurchaseReturn
+} = require('../../controllers/finance/purchaseReturnController');
 
 const router = express.Router();
 
 router.use(auth, branchScope);
 
-router.get('/', requirePermission('billing:view'), listPurchases);
+router.get('/', requirePermission('billing:view'), listPurchaseReturns);
 router.post(
   '/',
   requirePermission('billing:edit'),
   [
-    body('amount').isFloat({ min: 0 }),
+    body('totalAmount').optional().isFloat({ min: 0 }),
     body('billDate').optional().isISO8601(),
     body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
-    body('paidAt').optional().isISO8601(),
     body('items').optional().isArray(),
     body('attachments').optional().isArray()
   ],
   validate,
-  createPurchase
+  createPurchaseReturn
 );
 router.put(
   '/:id',
   requirePermission('billing:edit'),
   [
     param('id').isMongoId(),
-    body('amount').optional().isFloat({ min: 0 }),
+    body('totalAmount').optional().isFloat({ min: 0 }),
     body('billDate').optional().isISO8601(),
     body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
-    body('paidAt').optional().isISO8601(),
     body('items').optional().isArray(),
     body('attachments').optional().isArray()
   ],
   validate,
-  updatePurchase
+  updatePurchaseReturn
 );
-router.delete('/:id', requirePermission('billing:edit'), [param('id').isMongoId()], validate, deletePurchase);
+router.delete('/:id', requirePermission('billing:edit'), [param('id').isMongoId()], validate, deletePurchaseReturn);
 
 module.exports = router;
+

@@ -4,44 +4,50 @@ const auth = require('../../middleware/auth');
 const branchScope = require('../../middleware/branchScope');
 const requirePermission = require('../../middleware/requirePermission');
 const validate = require('../../middleware/validate');
-const { listPurchases, createPurchase, updatePurchase, deletePurchase } = require('../../controllers/finance/purchaseController');
+const {
+  listSalesReturns,
+  createSalesReturn,
+  updateSalesReturn,
+  deleteSalesReturn
+} = require('../../controllers/finance/salesReturnController');
 
 const router = express.Router();
 
 router.use(auth, branchScope);
 
-router.get('/', requirePermission('billing:view'), listPurchases);
+router.get('/', requirePermission('billing:view'), listSalesReturns);
 router.post(
   '/',
   requirePermission('billing:edit'),
   [
-    body('amount').isFloat({ min: 0 }),
-    body('billDate').optional().isISO8601(),
+    body('txnDate').optional().isISO8601(),
+    body('totalAmount').optional().isFloat({ min: 0 }),
+    body('netAmount').optional().isFloat({ min: 0 }),
     body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
-    body('paidAt').optional().isISO8601(),
     body('items').optional().isArray(),
     body('attachments').optional().isArray()
   ],
   validate,
-  createPurchase
+  createSalesReturn
 );
 router.put(
   '/:id',
   requirePermission('billing:edit'),
   [
     param('id').isMongoId(),
-    body('amount').optional().isFloat({ min: 0 }),
-    body('billDate').optional().isISO8601(),
+    body('txnDate').optional().isISO8601(),
+    body('totalAmount').optional().isFloat({ min: 0 }),
+    body('netAmount').optional().isFloat({ min: 0 }),
     body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),
-    body('paidAt').optional().isISO8601(),
     body('items').optional().isArray(),
     body('attachments').optional().isArray()
   ],
   validate,
-  updatePurchase
+  updateSalesReturn
 );
-router.delete('/:id', requirePermission('billing:edit'), [param('id').isMongoId()], validate, deletePurchase);
+router.delete('/:id', requirePermission('billing:edit'), [param('id').isMongoId()], validate, deleteSalesReturn);
 
 module.exports = router;
+

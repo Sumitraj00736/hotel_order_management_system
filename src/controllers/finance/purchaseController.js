@@ -13,16 +13,27 @@ const listPurchases = async (req, res) => {
 };
 
 const createPurchase = async (req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const computedAmount =
+    req.body.amount !== undefined
+      ? Number(req.body.amount || 0)
+      : items.reduce((sum, row) => sum + Number(row.amount ?? row.total ?? 0), 0);
   const payload = {
     branchId: req.branchId,
     supplierName: req.body.supplierName,
     referenceNo: req.body.referenceNo,
     title: req.body.title,
-    amount: Number(req.body.amount || 0),
+    billDate: req.body.billDate ? new Date(req.body.billDate) : undefined,
+    billReferenceNumber: req.body.billReferenceNumber,
+    purchaseStaff: req.body.purchaseStaff,
+    amount: computedAmount,
+    paymentStatus: req.body.paymentStatus || 'paid',
     paymentMethod: req.body.paymentMethod || 'cash',
+    multiplePayment: Boolean(req.body.multiplePayment),
     paidAt: req.body.paidAt ? new Date(req.body.paidAt) : new Date(),
     note: req.body.note,
-    items: Array.isArray(req.body.items) ? req.body.items : [],
+    items,
+    attachments: Array.isArray(req.body.attachments) ? req.body.attachments : [],
     createdBy: req.user?._id
   };
   const purchase = await Purchase.create(payload);
@@ -30,15 +41,28 @@ const createPurchase = async (req, res) => {
 };
 
 const updatePurchase = async (req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items : undefined;
+  const computedAmount =
+    req.body.amount !== undefined
+      ? Number(req.body.amount || 0)
+      : Array.isArray(items)
+        ? items.reduce((sum, row) => sum + Number(row.amount ?? row.total ?? 0), 0)
+        : undefined;
   const update = {
     supplierName: req.body.supplierName,
     referenceNo: req.body.referenceNo,
     title: req.body.title,
-    amount: req.body.amount !== undefined ? Number(req.body.amount || 0) : undefined,
+    billDate: req.body.billDate ? new Date(req.body.billDate) : undefined,
+    billReferenceNumber: req.body.billReferenceNumber,
+    purchaseStaff: req.body.purchaseStaff,
+    amount: computedAmount,
+    paymentStatus: req.body.paymentStatus,
     paymentMethod: req.body.paymentMethod,
+    multiplePayment: req.body.multiplePayment !== undefined ? Boolean(req.body.multiplePayment) : undefined,
     paidAt: req.body.paidAt ? new Date(req.body.paidAt) : undefined,
     note: req.body.note,
-    items: Array.isArray(req.body.items) ? req.body.items : undefined
+    items,
+    attachments: Array.isArray(req.body.attachments) ? req.body.attachments : undefined
   };
   const purchase = await Purchase.findOneAndUpdate(
     { _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) },

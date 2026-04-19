@@ -18,6 +18,7 @@
     "express-rate-limit": "^7.4.0",
     "express-validator": "^7.1.0",
     "firebase-admin": "^13.8.0",
+    "graphify": "^1.0.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.3",
