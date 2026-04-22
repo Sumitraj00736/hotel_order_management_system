@@ -9,7 +9,12 @@ const ingredientSchema = new mongoose.Schema(
     initialStock: { type: Number, min: 0, default: 0 },
     reorderLevel: { type: Number, required: true, min: 0, default: 0 },
     sku: { type: String, trim: true },
-    lastRestockedAt: { type: Date }
+    lastRestockedAt: { type: Date },
+    defaultPrice: { type: Number, min: 0, default: 0 },
+    group: { type: String, trim: true },
+    openingQty: { type: Number, min: 0, default: 0 },
+    openingRate: { type: Number, min: 0, default: 0 },
+    openingValue: { type: Number, min: 0, default: 0 }
   },
   { timestamps: true }
 );

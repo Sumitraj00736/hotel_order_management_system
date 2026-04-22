@@ -1,4 +1,6 @@
 const Purchase = require('../../models/finance/Purchase');
+const Ingredient = require('../../models/inventory/Ingredient');
+const StockTransaction = require('../../models/inventory/StockTransaction');
 
 const listPurchases = async (req, res) => {
   const filter = req.branchId ? { branchId: req.branchId } : {};
@@ -20,6 +22,7 @@ const createPurchase = async (req, res) => {
       : items.reduce((sum, row) => sum + Number(row.amount ?? row.total ?? 0), 0);
   const payload = {
     branchId: req.branchId,
+    supplierId: req.body.supplierId || undefined,
     supplierName: req.body.supplierName,
     referenceNo: req.body.referenceNo,
     title: req.body.title,
@@ -37,6 +40,36 @@ const createPurchase = async (req, res) => {
     createdBy: req.user?._id
   };
   const purchase = await Purchase.create(payload);
+
+  // Auto-restock linked ingredients
+  const restockOps = items.filter(i => i.ingredientId && Number(i.qty || i.quantity || 0) > 0);
+  if (restockOps.length > 0) {
+    await Promise.all(restockOps.map(async (row) => {
+      const qty = Number(row.qty || row.quantity || 0);
+      const rate = Number(row.rate || row.unitPrice || 0);
+      try {
+        const ingredient = await Ingredient.findOneAndUpdate(
+          { _id: row.ingredientId, ...(req.branchId ? { branchId: req.branchId } : {}) },
+          { $inc: { currentStock: qty }, lastRestockedAt: new Date() },
+          { new: true }
+        );
+        if (ingredient) {
+          await StockTransaction.create({
+            branchId: req.branchId,
+            ingredient: ingredient._id,
+            delta: qty,
+            reason: 'restock',
+            referencePurchase: purchase._id,
+            unitCost: rate,
+            totalCost: Math.round(qty * rate * 100) / 100,
+            note: `Purchase Bill: ${purchase.billReferenceNumber || purchase._id.toString().slice(-6)}`,
+            createdBy: req.user?._id
+          });
+        }
+      } catch (_) { /* skip failed ingredient update silently */ }
+    }));
+  }
+
   return res.status(201).json(purchase);
 };
 

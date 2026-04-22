@@ -101,15 +101,22 @@ const deleteIngredientUnit = async (req, res) => {
 
 const createIngredient = async (req, res) => {
   try {
-    const { name, unit, currentStock = 0, reorderLevel = 0, sku } = req.body;
+    const { name, unit, currentStock = 0, reorderLevel = 0, sku, defaultPrice, group, openingQty, openingRate } = req.body;
+    const oQty = Number(openingQty || 0);
+    const oRate = Number(openingRate || 0);
     const ingredient = await Ingredient.create({
       name,
       unit,
-      currentStock,
-      initialStock: currentStock,
-      reorderLevel,
+      currentStock: Number(currentStock),
+      initialStock: Number(currentStock),
+      reorderLevel: Number(reorderLevel),
       sku,
-      branchId: req.branchId
+      branchId: req.branchId,
+      defaultPrice: Number(defaultPrice || 0),
+      group: group || undefined,
+      openingQty: oQty,
+      openingRate: oRate,
+      openingValue: Math.round(oQty * oRate * 100) / 100
     });
     return res.status(201).json(ingredient);
   } catch (error) {
@@ -119,10 +126,16 @@ const createIngredient = async (req, res) => {
 
 const updateIngredient = async (req, res) => {
   try {
-    const updates = ['name', 'unit', 'currentStock', 'reorderLevel', 'sku'].reduce((acc, key) => {
+    const allowedFields = ['name', 'unit', 'currentStock', 'reorderLevel', 'sku', 'defaultPrice', 'group', 'openingQty', 'openingRate'];
+    const updates = allowedFields.reduce((acc, key) => {
       if (req.body[key] !== undefined) acc[key] = req.body[key];
       return acc;
     }, {});
+    if (updates.openingQty !== undefined || updates.openingRate !== undefined) {
+      const oQty = Number(updates.openingQty ?? 0);
+      const oRate = Number(updates.openingRate ?? 0);
+      updates.openingValue = Math.round(oQty * oRate * 100) / 100;
+    }
     const ingredient = await Ingredient.findByIdAndUpdate(req.params.id, updates, { new: true });
     if (!ingredient) {
       return res.status(404).json({ message: 'Ingredient not found' });

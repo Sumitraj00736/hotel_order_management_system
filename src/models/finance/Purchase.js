@@ -31,6 +31,7 @@ const purchaseItemSchema = new mongoose.Schema(
 const purchaseSchema = new mongoose.Schema(
   {
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
     supplierName: { type: String, trim: true },
     referenceNo: { type: String, trim: true },
     title: { type: String, trim: true },

@@ -18,6 +18,7 @@ const routeDefinitions = [
   { path: '/api/qr-codes', router: require('./tables/qrCodeRoutes') },
   { path: '/api/customers', router: require('./customers/customerRoutes') },
   { path: '/api/inventory', router: require('./inventory/inventoryRoutes') },
+  { path: '/api/suppliers', router: require('./supplier/supplierRoutes') },
   { path: '/api/taxes', router: require('./finance/taxRoutes') },
   { path: '/api/daybook', router: require('./finance/daybookRoutes') },
   { path: '/api/purchases', router: require('./finance/purchaseRoutes') },
