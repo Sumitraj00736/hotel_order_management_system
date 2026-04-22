@@ -282,7 +282,11 @@ const createOrder = async (req, res) => {
           createdBy: req.user._id,
           spiceLevel: spiceLevel || 'medium',
           specialInstructions,
-          customerName: req.body.customerName
+          customerName: req.body.customerName,
+          deliveryPlatform: req.body.deliveryPlatform,
+          customerPhone: req.body.customerPhone,
+          deliveryAddress: req.body.deliveryAddress,
+          assignedRider: req.body.assignedRider || undefined
         }
       ],
       { session }
