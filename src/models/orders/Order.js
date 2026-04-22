@@ -36,7 +36,7 @@ const orderSchema = new mongoose.Schema(
     changeDue: { type: Number, min: 0, default: 0 },
     invoiceNo: { type: String, trim: true },
     kotNo: { type: String, trim: true },
-    orderType: { type: String, enum: ['dine_in', 'takeaway', 'delivery', 'online', 'staff'], default: 'dine_in' },
+    orderType: { type: String, enum: ['dine_in', 'takeaway', 'delivery', 'pickup', 'online', 'staff'], default: 'dine_in' },
     customerName: { type: String, trim: true },
     paymentStatus: { type: String, enum: ['unpaid', 'partial', 'paid', 'credit'], default: 'unpaid' },
     status: {
