@@ -515,6 +515,17 @@ const updateOrder = async (req, res) => {
       await applyInventoryDelta(existingItems, orderItems, order._id, req.user?._id, session);
       order.items = orderItems;
       order.totalAmount = totalAmount;
+      
+      // Sync finalAmount if it exists (for live updates to show correctly in UI)
+      // If there's no discount/tax yet, finalAmount should match totalAmount
+      const subTotal = totalAmount;
+      const discountAmt = order.discountType === 'percent' 
+        ? (subTotal * (order.discountValue || 0)) / 100 
+        : (order.discountValue || 0);
+      const taxableAmount = Math.max(0, subTotal - discountAmt);
+      const taxAmount = (taxableAmount * (order.taxRate || 0)) / 100;
+      order.finalAmount = Math.max(0, taxableAmount + taxAmount + (order.tipsAmount || 0) + (order.roundOff || 0));
+      
       changes.push('items updated');
     }
 
