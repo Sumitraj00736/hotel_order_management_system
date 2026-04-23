@@ -1,26 +1,9 @@
 const PushSubscription = require('../../models/notifications/PushSubscription');
 
-const admin = require('firebase-admin');
-
-const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
-const firebaseClientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-const firebasePrivateKey = process.env.FIREBASE_PRIVATE_KEY;
+const { initFirebase, admin, isConfigured } = require('../firebase/admin');
 const firebaseVapidKey = process.env.FIREBASE_VAPID_KEY || '';
 
-const isConfigured = () => Boolean(firebaseProjectId && firebaseClientEmail && firebasePrivateKey);
 const getPublicKey = () => firebaseVapidKey;
-
-const initFirebase = () => {
-  if (!isConfigured()) return null;
-  if (admin.apps.length) return admin.app();
-  return admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: firebaseProjectId,
-      clientEmail: firebaseClientEmail,
-      privateKey: firebasePrivateKey.replace(/\\n/g, '\n')
-    })
-  });
-};
 
 const normalizeData = (data) => {
   if (!data) return {};

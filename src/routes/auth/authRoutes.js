@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const rateLimit = require('express-rate-limit');
-const { register, login } = require('../../controllers/auth/authController');
+const { register, login, firebaseLogin } = require('../../controllers/auth/authController');
 const validate = require('../../middleware/validate');
 
 const router = express.Router();
@@ -39,5 +39,7 @@ router.post(
   validate,
   login
 );
+
+router.post('/firebase-login', loginLimiter, firebaseLogin);
 
 module.exports = router;

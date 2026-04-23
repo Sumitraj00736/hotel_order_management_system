@@ -7,6 +7,7 @@ const UserBranchRole = require('../../models/users/UserBranchRole');
 const { slugify } = require('../../utils/common/slugify');
 const { logActivity } = require('../../utils/notifications/activity');
 const { resolveRolePermissions } = require('../../utils/auth/permissions');
+const { initFirebase, admin } = require('../../utils/firebase/admin');
 
 const createToken = (user) => {
   if (!process.env.JWT_SECRET) {
@@ -19,7 +20,7 @@ const createToken = (user) => {
 
 const register = async (req, res) => {
   try {
-    const { name, email, phone, password, cafeName, branchName } = req.body;
+    const { name, email, phone, password, cafeName, branchName, firebaseUid } = req.body;
 
     // ✅ 1. Mandatory field validation
     const missingFields = [];
@@ -61,14 +62,15 @@ const register = async (req, res) => {
       return res.status(409).json({ message: 'Phone number is already registered' });
     }
 
-    // ✅ Create new user (no conditional check needed now)
+    // ✅ Create new user
     const hashed = await bcrypt.hash(password, 10);
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
       phone: normalizedPhone,
       password: hashed,
-      role: 'superadmin'
+      role: 'superadmin',
+      firebaseUid: firebaseUid || undefined
     });
 
     // create organization + branch for this cafe and attach user as admin
@@ -190,4 +192,53 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { register, login };
+const firebaseLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ message: 'Token required' });
+
+    const app = initFirebase();
+    const decodedToken = await admin.auth(app).verifyIdToken(idToken);
+    const { uid, email, name, picture } = decodedToken;
+
+    let user = await User.findOne({ firebaseUid: uid });
+    if (!user && email) {
+      user = await User.findOne({ email: email.toLowerCase() });
+      if (user) {
+        user.firebaseUid = uid;
+        await user.save();
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({ 
+        message: 'Account not linked to staff record', 
+        code: 'USER_NOT_LINKED',
+        firebaseUid: uid 
+      });
+    }
+
+    const memberships = await UserBranchRole.find({ userId: user._id, active: true })
+      .populate('branchId', 'name code')
+      .populate('orgId', 'name slug');
+
+    const branches = memberships.map((m) => ({
+      branchId: m.branchId?._id || m.branchId,
+      branchName: m.branchId?.name,
+      code: m.branchId?.code,
+      orgName: m.orgId?.name,
+      orgSlug: m.orgId?.slug,
+      role: m.role,
+      permissions: m.permissions
+    }));
+
+    return res.json({
+      user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, picture },
+      branches
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Firebase login failed', error: error.message });
+  }
+};
+
+module.exports = { register, login, firebaseLogin };
