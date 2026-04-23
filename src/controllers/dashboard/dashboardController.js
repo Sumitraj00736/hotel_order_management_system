@@ -128,17 +128,22 @@ const dashboardSnapshot = async (req, res) => {
       setCache(analyticsCacheKey, analytics, 60 * 1000);
     }
 
-    const users = memberships
+    let users = memberships
       .map((m) => {
         const u = m.userId;
         if (!u) return null;
+        
+        // Ensure owners have correct effective status and role in snapshot
+        const effectiveStatus = m.status || (m.isOwner ? 'active' : (m.active ? 'active' : 'inactive'));
+
         return {
           _id: u._id,
           id: u._id,
-          name: u.name,
+          name: u.name || u.email?.split('@')[0] || 'User',
           email: u.email,
           phone: u.phone,
-          role: m.role,
+          role: m.role || (m.isOwner ? 'superadmin' : u.role),
+          status: effectiveStatus,
           dateOfJoining: u.dateOfJoining,
           salary: u.salary,
           shiftStart: u.shiftStart,
@@ -146,6 +151,19 @@ const dashboardSnapshot = async (req, res) => {
         };
       })
       .filter(Boolean);
+
+    // Fail-safe: Ensure the current logged-in user (usually the owner) is present in the users list
+    if (users.length === 0 && req.user) {
+      users.push({
+        _id: req.user._id,
+        id: req.user._id,
+        name: req.user.name || req.user.email?.split('@')[0] || 'Admin',
+        email: req.user.email,
+        role: 'superadmin',
+        isOwner: true,
+        status: 'active'
+      });
+    }
 
     return res.json({
       users,

@@ -58,10 +58,16 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   const status = err.status || 500;
   const message = err.message || 'Server error';
-  if (process.env.NODE_ENV !== 'production') {
-    // Helpful in dev; avoids leaking details in prod
-    console.error(err);
-  }
+  
+  // ALWAYS log errors in development to catch invisible crashes
+  console.error('[Global Error Handler]:', {
+    status,
+    message,
+    stack: err.stack,
+    url: req.originalUrl,
+    method: req.method
+  });
+
   res.status(status).json({ message });
 });
 

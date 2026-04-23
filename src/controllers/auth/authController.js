@@ -97,7 +97,9 @@ const register = async (req, res) => {
         orgId: org._id,
         role: 'superadmin',
         permissions: resolveRolePermissions({ roleName: 'superadmin' }),
-        isOwner: true
+        isOwner: true,
+        status: 'active',
+        active: true
       },
       { upsert: true, new: true }
     );
@@ -181,10 +183,13 @@ const login = async (req, res) => {
       permissions: m.permissions
     }));
 
+    // Determine effective role (Elevate to superadmin if an owner)
+    const effectiveRole = memberships.some(m => m.isOwner) ? 'superadmin' : (user.role || 'staff');
+
     const token = createToken(user);
     return res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role },
+      user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: effectiveRole },
       branches
     });
   } catch (error) {
@@ -206,6 +211,9 @@ const firebaseLogin = async (req, res) => {
       user = await User.findOne({ email: email.toLowerCase() });
       if (user) {
         user.firebaseUid = uid;
+        if ((!user.name || user.name === 'User') && name) {
+          user.name = name;
+        }
         await user.save();
       }
     }
@@ -232,8 +240,11 @@ const firebaseLogin = async (req, res) => {
       permissions: m.permissions
     }));
 
+    // Determine effective role (Elevate to superadmin if an owner)
+    const effectiveRole = memberships.some(m => m.isOwner) ? 'superadmin' : (user.role || 'staff');
+
     return res.json({
-      user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, picture },
+      user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: effectiveRole, picture },
       branches
     });
   } catch (error) {

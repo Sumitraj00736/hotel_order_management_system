@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/users/User');
-const admin = require('../utils/firebase/admin');
+const { initFirebase, admin, isConfigured } = require('../utils/firebase/admin');
 
 /**
  * Hybrid Auth Middleware
@@ -8,6 +8,9 @@ const admin = require('../utils/firebase/admin');
  * Prioritizes Firebase for modern security.
  */
 const auth = async (req, res, next) => {
+  // Ensure Firebase is initialized (if configured).
+  if (isConfigured()) initFirebase();
+
   try {
     const header = req.headers.authorization || '';
     const token = header.startsWith('Bearer ') ? header.substring(7) : null;
@@ -17,26 +20,39 @@ const auth = async (req, res, next) => {
     }
 
     // 1. Try Firebase verification first
-    try {
-      const decodedFirebaseToken = await admin.auth().verifyIdToken(token);
-      let user = await User.findOne({ firebaseUid: decodedFirebaseToken.uid }).select('-password');
-      
-      // If user exists but unlinked, try finding by email
-      if (!user && decodedFirebaseToken.email) {
-        user = await User.findOne({ email: decodedFirebaseToken.email }).select('-password');
-        if (user) {
-          user.firebaseUid = decodedFirebaseToken.uid;
-          await user.save();
-        }
-      }
+    if (isConfigured()) {
+      try {
+        const decodedFirebaseToken = await admin.auth().verifyIdToken(token);
 
-      if (user) {
-        req.user = user;
-        return next();
+        let user = await User.findOne({ firebaseUid: decodedFirebaseToken.uid }).select('-password');
+
+        // 1-time link: if firebaseUid not present but email matches, link it.
+        if (!user && decodedFirebaseToken.email) {
+          user = await User.findOne({ email: decodedFirebaseToken.email.toLowerCase() }).select('-password');
+          if (user && !user.firebaseUid) {
+            user.firebaseUid = decodedFirebaseToken.uid;
+            await user.save();
+          }
+        }
+
+        if (user) {
+          const UserBranchRole = require('../models/users/UserBranchRole');
+          // Support both legacy `active` boolean and modern `status` field.
+          const memberships = await UserBranchRole.find({
+            userId: user._id,
+            $or: [{ active: true }, { status: 'active' }]
+          });
+
+          if (memberships.some((m) => m.isOwner)) {
+            user.role = 'superadmin';
+          }
+
+          req.user = user;
+          return next();
+        }
+      } catch (fbError) {
+        // Fall through to legacy JWT verification.
       }
-    } catch (fbError) {
-      // Not a valid Firebase token, or user not found, fall back to JWT
-      // console.log('Firebase verification failed, falling back to legacy JWT');
     }
 
     // 2. Legacy JWT verification fallback
@@ -52,13 +68,26 @@ const auth = async (req, res, next) => {
         return res.status(401).json({ message: 'Invalid token' });
       }
 
-      req.user = user;
+      if (user) {
+        const UserBranchRole = require('../models/users/UserBranchRole');
+        const memberships = await UserBranchRole.find({
+          userId: user._id,
+          $or: [{ active: true }, { status: 'active' }]
+        });
+        if (memberships.some(m => m.isOwner)) {
+          user.role = 'superadmin';
+        }
+        req.user = user;
+      }
       return next();
     } catch (jwtError) {
-      return res.status(401).json({ message: 'Unauthorized', error: 'Invalid authentication token' });
+      return res.status(401).json({ 
+        message: 'Unauthorized', 
+        error: `Token verification failed: ${jwtError.message}`
+      });
     }
   } catch (error) {
-    return res.status(401).json({ message: 'Unauthorized', error: error.message });
+    return res.status(401).json({ message: 'Unauthorized', error: `Global Catch: ${error.message}` });
   }
 };
 

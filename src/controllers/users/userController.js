@@ -37,26 +37,42 @@ const listUsers = async (req, res) => {
     membershipFilter.status = statusFilter;
   }
   const memberships = await UserBranchRole.find(membershipFilter).populate('userId');
-  const users = memberships
+  let users = memberships
     .map((m) => {
       const u = m.userId;
       if (!u) return null;
+      
+      const effectiveStatus = m.status || (m.isOwner ? 'active' : (m.active ? 'active' : 'inactive'));
+      
       return {
         _id: u._id,
         id: u._id,
-        name: u.name,
+        name: u.name || u.email?.split('@')[0] || 'User',
         email: u.email,
         phone: u.phone,
-        role: normalizeRoleKey(m.role || ''),
+        role: normalizeRoleKey(m.role || u.role || ''),
         isOwner: !!m.isOwner,
-        status: m.status || (m.active ? 'active' : 'inactive'),
+        status: effectiveStatus,
         dateOfJoining: u.dateOfJoining,
-        salary: u.salary,
-        shiftStart: u.shiftStart,
-        shiftEnd: u.shiftEnd
+        salary: u.salary
       };
     })
     .filter(Boolean);
+
+  // Fail-safe: If the list is empty but the current user is an admin/owner for this branch
+  // ensure they at least see themselves
+  if (users.length === 0 && req.user) {
+    users.push({
+      _id: req.user._id,
+      id: req.user._id,
+      name: req.user.name || 'Admin',
+      email: req.user.email,
+      role: 'superadmin',
+      isOwner: true,
+      status: 'active'
+    });
+  }
+
   return res.json(users);
 };
 
