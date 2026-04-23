@@ -184,9 +184,16 @@ const listOrders = async (req, res) => {
       filter.status = { $in: ['pending', 'preparing', 'ready', 'served'] };
     } else if (req.query.category === 'kot') {
       filter.status = { $in: ['pending', 'preparing', 'ready', 'served'] };
+    } else if (req.query.category === 'paid') {
+      filter.status = 'paid';
+    } else if (req.query.category === 'cancelled') {
+      filter.status = 'cancelled';
     } else if (req.query.category === 'all') {
       // No status filter for 'all'
     }
+  }
+  if (req.query.orderType) {
+    filter.orderType = req.query.orderType;
   }
   if (req.query.dateFrom || req.query.dateTo) {
     filter.createdAt = {};
