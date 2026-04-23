@@ -97,9 +97,15 @@ const consumeInventory = async (orderItems, orderId, userId, session) => {
     if (!ingredient) continue;
     ingredient.currentStock -= required;
     await ingredient.save({ session });
+    
+    const unitCost = Number(ingredient.defaultPrice || 0);
+    const totalCost = unitCost * required;
+
     transactions.push({
       ingredient: ingredient._id,
       delta: -required,
+      unitCost,
+      totalCost,
       reason: 'order',
       referenceOrder: orderId,
       createdBy: userId
@@ -145,9 +151,15 @@ const applyInventoryDelta = async (oldItems, newItems, orderId, userId, session)
     if (!ing) continue;
     ing.currentStock -= delta; // delta positive consumes, negative adds back
     await ing.save({ session });
+    
+    const unitCost = Number(ing.defaultPrice || 0);
+    const totalCost = unitCost * Math.abs(delta);
+
     transactions.push({
       ingredient: ing._id,
       delta: -delta,
+      unitCost,
+      totalCost,
       reason: 'order',
       referenceOrder: orderId,
       createdBy: userId

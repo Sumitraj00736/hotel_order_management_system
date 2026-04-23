@@ -6,6 +6,7 @@ const Payment = require('../../models/finance/Payment');
 const SalesReturn = require('../../models/finance/SalesReturn');
 const PurchaseReturn = require('../../models/finance/PurchaseReturn');
 const DaybookClose = require('../../models/finance/DaybookClose');
+const SalesInvoice = require('../../models/finance/SalesInvoice');
 
 const startOfDay = (d) => {
   const date = new Date(d);
@@ -105,7 +106,7 @@ const computeDaybook = async ({ branchId, day }) => {
   const matchBranch = branchId ? { branchId } : {};
 
   const [
-    salesRows,
+    salesInvoices,
     purchaseRows,
     expenseRows,
     incomeRows,
@@ -114,8 +115,8 @@ const computeDaybook = async ({ branchId, day }) => {
     purchaseReturnRows,
     previousClose
   ] = await Promise.all([
-    CustomerHistory.find({ ...matchBranch, paidAt: { $gte: from, $lte: to } })
-      .select('paymentMethod totalAmount finalAmount paymentStatus')
+    SalesInvoice.find({ ...matchBranch, closedAt: { $gte: from, $lte: to } })
+      .select('grandTotal amountPaid amountDue paymentStatus closedAt')
       .lean(),
     Purchase.find({ ...matchBranch, paidAt: { $gte: from, $lte: to } })
       .select('paymentMethod amount paymentStatus')
@@ -127,7 +128,7 @@ const computeDaybook = async ({ branchId, day }) => {
       .select('paymentMethod amount paymentStatus')
       .lean(),
     Payment.find({ ...matchBranch, txnDate: { $gte: from, $lte: to } })
-      .select('direction paymentMethod amount paymentStatus entryType')
+      .select('direction paymentMethod amount paymentStatus entryType invoiceId')
       .lean(),
     SalesReturn.find({ ...matchBranch, txnDate: { $gte: from, $lte: to } })
       .select('paymentMethod netAmount totalAmount paymentStatus')
@@ -146,9 +147,11 @@ const computeDaybook = async ({ branchId, day }) => {
   const expenses = initBuckets();
   const income = initBuckets();
 
-  for (const row of salesRows) {
-    const amt = Number(row.finalAmount ?? row.totalAmount ?? 0);
-    addAmount(netSales, row.paymentMethod, amt, row.paymentStatus);
+  // For Net Sales, we extract the credit due directly from SalesInvoice
+  for (const invoice of salesInvoices) {
+    if (invoice.amountDue > 0) {
+      netSales.creditDue += Number(invoice.amountDue || 0);
+    }
   }
 
   for (const row of purchaseRows) {
@@ -170,6 +173,7 @@ const computeDaybook = async ({ branchId, day }) => {
   const balanceTransferIn = initBuckets();
   const balanceTransferOut = initBuckets();
 
+  // Parse Payments to route them correctly
   for (const row of paymentRows) {
     const amt = Number(row.amount || 0);
     const st = row.paymentStatus;
@@ -178,7 +182,12 @@ const computeDaybook = async ({ branchId, day }) => {
     } else if (row.entryType === 'balance_transfer_out') {
       addAmount(balanceTransferOut, row.paymentMethod, amt, st);
     } else if (row.direction === 'in') {
-      addAmount(paymentIn, row.paymentMethod, amt, st);
+      // If this payment was tied to a SalesInvoice, it belongs in netSales buckets!
+      if (row.invoiceId) {
+        addAmount(netSales, row.paymentMethod, amt, st);
+      } else {
+        addAmount(paymentIn, row.paymentMethod, amt, st);
+      }
     } else if (row.direction === 'out') {
       addAmount(paymentOut, row.paymentMethod, amt, st);
     }

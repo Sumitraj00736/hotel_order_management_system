@@ -16,6 +16,7 @@ const attachmentSchema = new mongoose.Schema(
 const paymentSchema = new mongoose.Schema(
   {
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', index: true },
+    invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'SalesInvoice', index: true },
 
     direction: { type: String, enum: ['in', 'out'], required: true },
     amount: { type: Number, required: true, min: 0 },
