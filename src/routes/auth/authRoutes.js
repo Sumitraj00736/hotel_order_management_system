@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const rateLimit = require('express-rate-limit');
-const { register, login, firebaseLogin } = require('../../controllers/auth/authController');
+const { register, login, firebaseLogin, forgotPassword, resetPassword } = require('../../controllers/auth/authController');
 const validate = require('../../middleware/validate');
 
 const router = express.Router();
@@ -41,5 +41,24 @@ router.post(
 );
 
 router.post('/firebase-login', loginLimiter, firebaseLogin);
+
+router.post(
+  '/forgot-password',
+  loginLimiter,
+  [body('email').isEmail()],
+  validate,
+  forgotPassword
+);
+
+router.post(
+  '/reset-password',
+  loginLimiter,
+  [
+    body('token').notEmpty(),
+    body('password').isLength({ min: 6 })
+  ],
+  validate,
+  resetPassword
+);
 
 module.exports = router;

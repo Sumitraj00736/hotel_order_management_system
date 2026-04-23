@@ -19,7 +19,9 @@ const userSchema = new mongoose.Schema(
         effectiveDate: { type: Date, required: true },
         note: { type: String, trim: true }
       }
-    ]
+    ],
+    resetPasswordToken: String,
+    resetPasswordExpires: Date
   },
   { timestamps: true }
 );

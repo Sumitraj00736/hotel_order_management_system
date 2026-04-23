@@ -7,7 +7,8 @@ const env = {
   nodeEnv: getEnv('NODE_ENV', 'development'),
   port: getEnv('PORT'),
   mongoUri: getEnv('MONGO_URI'),
-  jwtSecret: getEnv('JWT_SECRET')
+  jwtSecret: getEnv('JWT_SECRET'),
+  frontendUrl: getEnv('FRONTEND_URL', 'http://localhost:5173')
 };
 
 const validateRequiredEnv = () => {

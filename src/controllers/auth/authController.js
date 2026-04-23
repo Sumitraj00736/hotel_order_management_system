@@ -252,4 +252,92 @@ const firebaseLogin = async (req, res) => {
   }
 };
 
-module.exports = { register, login, firebaseLogin };
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      // For security, don't reveal if user exists or not
+      return res.status(200).json({ message: 'If an account exists, a reset link has been sent.' });
+    }
+
+    // Generate token
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    // Create reset URL (pointing to frontend)
+    const { env } = require('../../config/env');
+    const resetUrl = `${env.frontendUrl}/reset-password/${resetToken}`;
+
+    // Note: In production, use a real email service
+    console.log(`[PASSWORD RESET LINK]: ${resetUrl}`);
+
+    try {
+      const nodemailer = require('nodemailer');
+      // Configuration for nodemailer (Placeholder - user needs to provide credentials)
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        }
+      });
+
+      const mailOptions = {
+        to: user.email,
+        from: 'HotelOms <noreply@hoteloms.com>',
+        subject: 'Password Reset Request',
+        text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n` +
+          `Please click on the following link, or paste this into your browser to complete the process:\n\n` +
+          `${resetUrl}\n\n` +
+          `If you did not request this, please ignore this email and your password will remain unchanged.\n`
+      };
+
+      await transporter.sendMail(mailOptions);
+      res.status(200).json({ message: 'Reset link sent to email' });
+    } catch (err) {
+      console.error('[Mailer Error]:', err.message);
+      // Even if email fails in dev, we return success but log the link
+      res.status(200).json({ message: 'If an account exists, a reset link has been sent.' });
+    }
+
+  } catch (error) {
+    res.status(500).json({ message: 'Error in forgot password request', error: error.message });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    const crypto = require('crypto');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    // Hash new password
+    const hashed = await bcrypt.hash(password, 10);
+    user.password = hashed;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Password reset successful. You can now login.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error in password reset', error: error.message });
+  }
+};
+
+module.exports = { register, login, firebaseLogin, forgotPassword, resetPassword };
