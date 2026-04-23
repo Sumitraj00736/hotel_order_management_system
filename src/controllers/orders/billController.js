@@ -52,7 +52,12 @@ const generateBill = async (req, res) => {
     waiter: order.createdBy?.name,
     kitchen: order.kitchenAssigned?.name,
     paymentMethod: order.paymentMethod || null,
-    paidAt: order.paidAt || null
+    paidAt: order.paidAt || null,
+    orderType: order.orderType,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    deliveryAddress: order.deliveryAddress,
+    deliveryPlatform: order.deliveryPlatform
   };
 
   return res.json(bill);

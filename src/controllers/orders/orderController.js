@@ -182,10 +182,8 @@ const listOrders = async (req, res) => {
   } else if (req.query.category) {
     if (req.query.category === 'active') {
       filter.status = 'pending';
-    } else if (req.query.category === 'paid') {
-      filter.status = 'paid';
-    } else if (req.query.category === 'cancelled') {
-      filter.status = 'cancelled';
+    } else if (req.query.category === 'kot') {
+      filter.status = { $in: ['paid', 'cancelled'] };
     } else if (req.query.category === 'all') {
       // No status filter for 'all'
     }
