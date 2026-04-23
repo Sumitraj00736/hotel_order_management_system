@@ -255,39 +255,6 @@ const payBill = async (req, res) => {
       }
     }
     
-    // Legacy support: We still write to CustomerHistory simply to not break any existing simple reports 
-    // that haven't been migrated yet, but it can be safely removed later.
-    const existingHistory = await CustomerHistory.findOne({ orderId: order._id }).session(session);
-    if (!existingHistory) {
-      await CustomerHistory.create([{
-        branchId: req.branchId,
-        orderId: order._id,
-        tableNumber: order.table?.tableNumber,
-        items: order.items.map((item) => ({
-          name: item.menuItem?.name || item.name || 'Item',
-          quantity: item.quantity,
-          priceAtOrderTime: item.priceAtOrderTime
-        })),
-        totalAmount: order.totalAmount,
-        invoiceNo: order.invoiceNo,
-        paymentMode: order.paymentMethod,
-        finalAmount,
-        discountAmount: discountAmt,
-        taxAmount,
-        paymentMethod: payments[0]?.method || 'cash',
-        paidAt: order.paidAt,
-        waiter: {
-          id: order.createdBy?._id,
-          name: order.createdBy?.name
-        },
-        kitchen: {
-          id: order.kitchenAssigned?._id,
-          name: order.kitchenAssigned?.name
-        },
-        orderTakenAt: order.createdAt
-      }], { session });
-    }
-
     await session.commitTransaction();
     session.endSession();
 
