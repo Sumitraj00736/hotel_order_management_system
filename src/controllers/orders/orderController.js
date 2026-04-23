@@ -184,6 +184,10 @@ const listOrders = async (req, res) => {
       filter.status = { $in: ['pending', 'preparing', 'ready', 'served'] };
     } else if (req.query.category === 'kot') {
       filter.status = { $in: ['pending', 'preparing', 'ready', 'served'] };
+      // Scope KOT view to orders created today only (kitchen board)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      filter.createdAt = { $gte: todayStart };
     } else if (req.query.category === 'paid') {
       filter.status = 'paid';
     } else if (req.query.category === 'cancelled') {
@@ -515,15 +519,15 @@ const updateOrder = async (req, res) => {
       await applyInventoryDelta(existingItems, orderItems, order._id, req.user?._id, session);
       order.items = orderItems;
       order.totalAmount = totalAmount;
+      order.subTotal = totalAmount;  // Sync subTotal so payBill uses correct base
       
-      // Sync finalAmount if it exists (for live updates to show correctly in UI)
-      // If there's no discount/tax yet, finalAmount should match totalAmount
-      const subTotal = totalAmount;
+      // Recalculate finalAmount preserving any existing discount/tax
       const discountAmt = order.discountType === 'percent' 
-        ? (subTotal * (order.discountValue || 0)) / 100 
+        ? (totalAmount * (order.discountValue || 0)) / 100 
         : (order.discountValue || 0);
-      const taxableAmount = Math.max(0, subTotal - discountAmt);
+      const taxableAmount = Math.max(0, totalAmount - discountAmt);
       const taxAmount = (taxableAmount * (order.taxRate || 0)) / 100;
+      order.taxableAmount = taxableAmount;  // Sync taxableAmount for correct bill display
       order.finalAmount = Math.max(0, taxableAmount + taxAmount + (order.tipsAmount || 0) + (order.roundOff || 0));
       
       changes.push('items updated');
