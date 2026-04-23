@@ -292,11 +292,37 @@ const forgotPassword = async (req, res) => {
       const mailOptions = {
         to: user.email,
         from: 'HotelOms <noreply@hoteloms.com>',
-        subject: 'Password Reset Request',
-        text: `You are receiving this because you (or someone else) have requested the reset of the password for your account.\n\n` +
-          `Please click on the following link, or paste this into your browser to complete the process:\n\n` +
-          `${resetUrl}\n\n` +
-          `If you did not request this, please ignore this email and your password will remain unchanged.\n`
+        subject: 'Reset your HotelOms password',
+        html: `
+          <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8fafc; padding: 40px 20px; border-radius: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #0f172a; margin: 0; font-size: 28px; font-weight: 800;">HotelOms</h1>
+              <p style="color: #64748b; font-size: 14px;">Secure Management Solutions</p>
+            </div>
+            
+            <div style="background-color: #ffffff; padding: 40px; border-radius: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+              <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">Password Reset Request</h2>
+              <p style="color: #475569; line-height: 1.6; font-size: 16px;">
+                You told us you lost your password. No worries! Click the button below to set up a new one and get back into your dashboard.
+              </p>
+              
+              <div style="text-align: center; margin: 35px 0;">
+                <a href="${resetUrl}" style="background-color: #3b82f6; color: #ffffff; padding: 16px 32px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 16px; display: inline-block; transition: background-color 0.2s;">
+                  Reset My Password
+                </a>
+              </div>
+              
+              <p style="color: #94a3b8; font-size: 14px; line-height: 1.6;">
+                This link will expires in 60 minutes for your security. 
+                If you didn't ask for this, you can just ignore this email.
+              </p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; color: #94a3b8; font-size: 12px;">
+              <p>© 2024 HotelOms. All rights reserved.</p>
+            </div>
+          </div>
+        `
       };
 
       await transporter.sendMail(mailOptions);
@@ -327,9 +353,24 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired reset token' });
     }
 
-    // Hash new password
+    // Hash new password for MongoDB (Legacy fallback)
     const hashed = await bcrypt.hash(password, 10);
     user.password = hashed;
+    
+    // Sync with Firebase if the user has a firebaseUid
+    if (user.firebaseUid) {
+      try {
+        const { admin } = require('../../utils/firebase/admin');
+        await admin.auth().updateUser(user.firebaseUid, {
+          password: password
+        });
+        console.log(`[Auth] Firebase password synced for UID: ${user.firebaseUid}`);
+      } catch (fbError) {
+        console.error('[Auth] Firebase password sync failed:', fbError.message);
+        // We continue because MongoDB is updated, but this is a warning
+      }
+    }
+
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
