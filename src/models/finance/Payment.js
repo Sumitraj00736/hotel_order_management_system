@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 
+const MathUtils = require('../../utils/mathUtils');
+
 const attachmentSchema = new mongoose.Schema(
   {
     url: { type: String, trim: true },
@@ -45,6 +47,12 @@ const paymentSchema = new mongoose.Schema(
     txnDate: { type: Date, default: Date.now },
     remarks: { type: String, trim: true, default: '' },
     attachments: { type: [attachmentSchema], default: [] },
+    
+    // Auditing / Voiding
+    status: { type: String, enum: ['active', 'void'], default: 'active' },
+    voidReason: { type: String, trim: true },
+    voidedAt: { type: Date },
+    voidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   },
@@ -53,6 +61,14 @@ const paymentSchema = new mongoose.Schema(
 
 paymentSchema.index({ branchId: 1, txnDate: -1 });
 paymentSchema.index({ branchId: 1, createdAt: -1 });
+
+// Ensure strict float rounding before saving
+paymentSchema.pre('save', function (next) {
+  if (this.isModified('amount')) {
+    this.amount = MathUtils.roundAmount(this.amount);
+  }
+  next();
+});
 
 module.exports = mongoose.model('Payment', paymentSchema);
 
