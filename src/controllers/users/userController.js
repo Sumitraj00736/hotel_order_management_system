@@ -199,9 +199,17 @@ const updateUser = async (req, res) => {
     }
 
     if ((email && email !== user.email) || (phone && phone !== user.phone)) {
-      const existing = await User.findOne({ $or: [{ email }, { phone }] });
+      // Check if new email/phone is taken by ANOTHER user
+      const existing = await User.findOne({ 
+        $or: [
+          ...(email ? [{ email }] : []),
+          ...(phone ? [{ phone }] : [])
+        ], 
+        _id: { $ne: user._id } 
+      });
+      
       if (existing) {
-        return res.status(409).json({ message: 'Email or phone already in use' });
+        return res.status(409).json({ message: 'Email or phone already in use by another account' });
       }
       if (email) user.email = email;
       if (phone) user.phone = phone;

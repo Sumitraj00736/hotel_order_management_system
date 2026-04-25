@@ -326,11 +326,18 @@ const forgotPassword = async (req, res) => {
       };
 
       await transporter.sendMail(mailOptions);
-      res.status(200).json({ message: 'Reset link sent to email' });
+      // In development we also return the URL so it can be tested without email delivery.
+      res.status(200).json({
+        message: 'Reset link sent to email',
+        ...(env.nodeEnv !== 'production' ? { resetUrl } : {})
+      });
     } catch (err) {
       console.error('[Mailer Error]:', err.message);
-      // Even if email fails in dev, we return success but log the link
-      res.status(200).json({ message: 'If an account exists, a reset link has been sent.' });
+      // Do not leak existence in production. In development return the resetUrl for easy testing.
+      res.status(200).json({
+        message: 'If an account exists, a reset link has been sent.',
+        ...(env.nodeEnv !== 'production' ? { resetUrl } : {})
+      });
     }
 
   } catch (error) {
@@ -357,18 +364,34 @@ const resetPassword = async (req, res) => {
     const hashed = await bcrypt.hash(password, 10);
     user.password = hashed;
     
-    // Sync with Firebase if the user has a firebaseUid
-    if (user.firebaseUid) {
-      try {
-        const { admin } = require('../../utils/firebase/admin');
-        await admin.auth().updateUser(user.firebaseUid, {
-          password: password
-        });
-        console.log(`[Auth] Firebase password synced for UID: ${user.firebaseUid}`);
-      } catch (fbError) {
-        console.error('[Auth] Firebase password sync failed:', fbError.message);
-        // We continue because MongoDB is updated, but this is a warning
+    // Best-effort Firebase password sync:
+    // - If firebaseUid exists: update by UID
+    // - Else: try to find Firebase user by email and then update + backfill firebaseUid
+    try {
+      const { initFirebase, admin, isConfigured } = require('../../utils/firebase/admin');
+      if (isConfigured()) {
+        const app = initFirebase();
+        const auth = admin.auth(app);
+
+        let firebaseUid = user.firebaseUid;
+        if (!firebaseUid && user.email) {
+          try {
+            const fbUser = await auth.getUserByEmail(user.email);
+            firebaseUid = fbUser.uid;
+            user.firebaseUid = fbUser.uid;
+          } catch (_) {
+            // Not a Firebase user - ignore.
+          }
+        }
+
+        if (firebaseUid) {
+          await auth.updateUser(firebaseUid, { password });
+          console.log(`[Auth] Firebase password synced for UID: ${firebaseUid}`);
+        }
       }
+    } catch (fbError) {
+      console.error('[Auth] Firebase password sync failed:', fbError.message);
+      // Continue: Mongo password reset still succeeds.
     }
 
     user.resetPasswordToken = undefined;
@@ -381,4 +404,29 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { register, login, firebaseLogin, forgotPassword, resetPassword };
+const checkPhone = async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ message: 'Phone number required' });
+
+    // Normalize: remove +, search for variations
+    const cleanPhone = phone.replace('+', '').trim();
+    
+    const user = await User.findOne({ 
+      $or: [
+        { phone: phone.trim() },
+        { phone: cleanPhone }
+      ]
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'This phone number is not registered as staff.' });
+    }
+
+    return res.status(200).json({ message: 'User found', name: user.name });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error checking phone', error: error.message });
+  }
+};
+
+module.exports = { register, login, firebaseLogin, forgotPassword, resetPassword, checkPhone };
