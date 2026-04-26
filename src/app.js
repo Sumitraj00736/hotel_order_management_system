@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const compression = require('compression');
 const { buildCorsOptions } = require('./config/http/cors');
 const { registerApiRoutes } = require('./routes');
+const requestContext = require('./middleware/requestContext');
 
 // Ensure future finance collections are registered with Mongoose (scalable schemas).
 require('./models/finance/JournalVoucher');
@@ -15,6 +16,7 @@ require('./models/finance/DaybookSession');
 
 const app = express();
 
+app.use(requestContext);
 app.use(cors(buildCorsOptions()));
 app.use(helmet());
 app.use(compression());
@@ -31,7 +33,21 @@ app.use(
   })
 );
 app.use(express.json());
-app.use(morgan('dev'));
+app.use(
+  morgan((tokens, req, res) =>
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      level: 'info',
+      type: 'http',
+      requestId: req.requestId,
+      method: tokens.method(req, res),
+      path: tokens.url(req, res),
+      status: Number(tokens.status(req, res)),
+      responseTimeMs: Number(tokens['response-time'](req, res)),
+      contentLength: tokens.res(req, res, 'content-length') || '0'
+    })
+  )
+);
 
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'hotel-order-backend' });
@@ -58,17 +74,23 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   const status = err.status || 500;
   const message = err.message || 'Server error';
-  
-  // ALWAYS log errors in development to catch invisible crashes
-  console.error('[Global Error Handler]:', {
-    status,
-    message,
-    stack: err.stack,
-    url: req.originalUrl,
-    method: req.method
-  });
 
-  res.status(status).json({ message });
+  if (req.log) {
+    req.log.error('Unhandled request error', {
+      status,
+      error: err
+    });
+  } else {
+    console.error('[Global Error Handler]:', {
+      status,
+      message,
+      stack: err.stack,
+      url: req.originalUrl,
+      method: req.method
+    });
+  }
+
+  res.status(status).json({ message, requestId: req.requestId });
 });
 
 module.exports = app;

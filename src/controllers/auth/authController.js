@@ -8,6 +8,7 @@ const { slugify } = require('../../utils/common/slugify');
 const { logActivity } = require('../../utils/notifications/activity');
 const { resolveRolePermissions } = require('../../utils/auth/permissions');
 const { initFirebase, admin } = require('../../utils/firebase/admin');
+const { normalizeEmail, normalizePhone, resolveLoginIdentifier } = require('../../utils/auth/identity');
 
 const createToken = (user) => {
   if (!process.env.JWT_SECRET) {
@@ -47,8 +48,8 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
-    const normalizedEmail = email.toLowerCase();
-    const normalizedPhone = phone.trim();
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedPhone = normalizePhone(phone);
 
     // ✅ 4. Check email duplicate
     const emailExists = await User.findOne({ email: normalizedEmail });
@@ -144,14 +145,25 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, phone, identifier, password } = req.body;
-    const loginValue = email || phone || identifier;
-    const user = await User.findOne({ $or: [{ email: loginValue }, { phone: loginValue }] });
+    const loginIdentity = resolveLoginIdentifier({ email, phone, identifier });
+    if (!loginIdentity.lookup.length || !password) {
+      return res.status(400).json({ message: 'Identifier and password are required' });
+    }
+
+    const user = await User.findOne({ $or: loginIdentity.lookup });
     if (!user) {
+      req.log?.warn('Login rejected for unknown account', { loginType: loginIdentity.type });
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    if (!user.password) {
+      req.log?.warn('Login rejected for passwordless account', { userId: user._id.toString() });
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
+      req.log?.warn('Login rejected for invalid password', { userId: user._id.toString() });
       return res.status(401).json({ message: 'Invalid credentials' });
     }
  
@@ -187,12 +199,14 @@ const login = async (req, res) => {
     const effectiveRole = memberships.some(m => m.isOwner) ? 'superadmin' : (user.role || 'staff');
 
     const token = createToken(user);
+    req.log?.info('Login successful', { userId: user._id.toString(), branches: branches.length });
     return res.json({
       token,
       user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: effectiveRole },
       branches
     });
   } catch (error) {
+    req.log?.error('Login failed', { error });
     return res.status(500).json({ message: 'Login failed', error: error.message });
   }
 };
@@ -226,9 +240,21 @@ const firebaseLogin = async (req, res) => {
       });
     }
 
-    const memberships = await UserBranchRole.find({ userId: user._id, active: true })
+    const allMemberships = await UserBranchRole.find({ userId: user._id })
       .populate('branchId', 'name code')
       .populate('orgId', 'name slug');
+    const memberships = allMemberships.filter(
+      (m) => m.status === 'active' || (m.status === undefined && m.active === true)
+    );
+    if (!memberships.length) {
+      const blocked = allMemberships.find((m) => m.status === 'pending' || m.status === 'inactive') || allMemberships[0];
+      return res.status(403).json({
+        message: 'Account is pending or inactive',
+        pendingUser: user.name,
+        branchName: blocked?.branchId?.name || 'your branch',
+        status: blocked?.status || 'inactive'
+      });
+    }
 
     const branches = memberships.map((m) => ({
       branchId: m.branchId?._id || m.branchId,
@@ -248,14 +274,16 @@ const firebaseLogin = async (req, res) => {
       branches
     });
   } catch (error) {
-    return res.status(500).json({ message: 'Firebase login failed', error: error.message });
+    const status = error?.code === 'auth/id-token-expired' || error?.code === 'auth/argument-error' ? 401 : 500;
+    req.log?.error('Firebase login failed', { error });
+    return res.status(status).json({ message: 'Firebase login failed', error: error.message });
   }
 };
 
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: normalizeEmail(email) });
 
     if (!user) {
       // For security, don't reveal if user exists or not
@@ -276,7 +304,10 @@ const forgotPassword = async (req, res) => {
     const resetUrl = `${env.frontendUrl}/reset-password/${resetToken}`;
 
     // Note: In production, use a real email service
-    console.log(`[PASSWORD RESET LINK]: ${resetUrl}`);
+    req.log?.info('Password reset token issued', {
+      targetUserId: user._id.toString(),
+      delivery: process.env.EMAIL_USER && process.env.EMAIL_PASS ? 'email' : 'development-link'
+    });
 
     try {
       const nodemailer = require('nodemailer');
@@ -332,7 +363,7 @@ const forgotPassword = async (req, res) => {
         ...(env.nodeEnv !== 'production' ? { resetUrl } : {})
       });
     } catch (err) {
-      console.error('[Mailer Error]:', err.message);
+      req.log?.warn('Password reset email delivery failed', { error: err });
       // Do not leak existence in production. In development return the resetUrl for easy testing.
       res.status(200).json({
         message: 'If an account exists, a reset link has been sent.',
@@ -341,6 +372,7 @@ const forgotPassword = async (req, res) => {
     }
 
   } catch (error) {
+    req.log?.error('Forgot password request failed', { error });
     res.status(500).json({ message: 'Error in forgot password request', error: error.message });
   }
 };
@@ -386,11 +418,11 @@ const resetPassword = async (req, res) => {
 
         if (firebaseUid) {
           await auth.updateUser(firebaseUid, { password });
-          console.log(`[Auth] Firebase password synced for UID: ${firebaseUid}`);
+          req.log?.info('Firebase password synced after reset', { firebaseUid });
         }
       }
     } catch (fbError) {
-      console.error('[Auth] Firebase password sync failed:', fbError.message);
+      req.log?.warn('Firebase password sync failed after reset', { error: fbError });
       // Continue: Mongo password reset still succeeds.
     }
 
@@ -398,8 +430,10 @@ const resetPassword = async (req, res) => {
     user.resetPasswordExpires = undefined;
     await user.save();
 
+    req.log?.info('Password reset successful', { userId: user._id.toString() });
     res.status(200).json({ message: 'Password reset successful. You can now login.' });
   } catch (error) {
+    req.log?.error('Password reset failed', { error });
     res.status(500).json({ message: 'Error in password reset', error: error.message });
   }
 };
@@ -410,11 +444,11 @@ const checkPhone = async (req, res) => {
     if (!phone) return res.status(400).json({ message: 'Phone number required' });
 
     // Normalize: remove +, search for variations
-    const cleanPhone = phone.replace('+', '').trim();
+    const cleanPhone = normalizePhone(phone);
     
     const user = await User.findOne({ 
       $or: [
-        { phone: phone.trim() },
+        { phone: String(phone).trim() },
         { phone: cleanPhone }
       ]
     });

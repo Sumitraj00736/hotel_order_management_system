@@ -4,7 +4,7 @@ const UserBranchRole = require('../../models/users/UserBranchRole');
 const Table = require('../../models/tables/Table');
 const MenuItem = require('../../models/menu/MenuItem');
 const AddOn = require('../../models/menu/AddOn');
-const CustomerHistory = require('../../models/customers/CustomerHistory');
+const Customer = require('../../models/customers/Customer');
 
 const ensureSubscription = async (branchId) => {
   let sub = await Subscription.findOne({ branchId });
@@ -22,7 +22,7 @@ const getBillingSummary = async (req, res) => {
     Table.countDocuments({ branchId }),
     MenuItem.countDocuments({ branchId }),
     AddOn.countDocuments({ branchId }),
-    CustomerHistory.countDocuments({ branchId }),
+    Customer.countDocuments({ branchId, active: { $ne: false } }),
     SubscriptionHistory.find({ branchId }).sort({ purchaseDate: -1 }).limit(10)
   ]);
 

@@ -34,13 +34,23 @@ router.post(
     body('password').notEmpty(),
     body('email').optional().isEmail(),
     body('phone').optional().isString(),
-    body('identifier').optional().isString()
+    body('identifier').optional().isString(),
+    body().custom((value) => {
+      if (value?.email || value?.phone || value?.identifier) return true;
+      throw new Error('Email, phone, or identifier is required');
+    })
   ],
   validate,
   login
 );
 
-router.post('/firebase-login', loginLimiter, firebaseLogin);
+router.post(
+  '/firebase-login',
+  loginLimiter,
+  [body('idToken').notEmpty()],
+  validate,
+  firebaseLogin
+);
 
 router.post(
   '/forgot-password',

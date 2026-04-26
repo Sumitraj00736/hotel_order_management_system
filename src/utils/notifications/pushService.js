@@ -1,6 +1,7 @@
 const PushSubscription = require('../../models/notifications/PushSubscription');
 
 const { initFirebase, admin, isConfigured } = require('../firebase/admin');
+const { emitLog } = require('../observability/logger');
 const firebaseVapidKey = process.env.FIREBASE_VAPID_KEY || '';
 
 const getPublicKey = () => firebaseVapidKey;
@@ -21,25 +22,68 @@ const disableTokens = async (tokens) => {
 };
 
 const sendToTokens = async (tokens, payload) => {
-  if (!tokens.length) return;
+  if (!tokens.length) {
+    emitLog({ level: 'warn', message: 'Push send skipped: no tokens available', type: 'push' });
+    return { attempted: 0, successCount: 0, failureCount: 0, invalidTokens: [] };
+  }
   const app = initFirebase();
-  if (!app) return;
+  if (!app) {
+    emitLog({ level: 'warn', message: 'Push send skipped: Firebase app unavailable', type: 'push' });
+    return { attempted: tokens.length, successCount: 0, failureCount: tokens.length, invalidTokens: [] };
+  }
   const messaging = admin.messaging(app);
   try {
     const response = await messaging.sendEachForMulticast({ ...payload, tokens });
-    console.log(`[PushService] Sent to ${tokens.length} tokens. Success: ${response.successCount}, Failure: ${response.failureCount}`);
+    emitLog({
+      level: response.failureCount > 0 ? 'warn' : 'info',
+      message: 'Push multicast completed',
+      type: 'push',
+      attempted: tokens.length,
+      successCount: response.successCount,
+      failureCount: response.failureCount
+    });
     const invalidTokens = [];
+    const failureCodes = [];
     response.responses.forEach((res, idx) => {
       if (!res.success) {
         const code = res.error?.code;
+        if (code) failureCodes.push(code);
         if (code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token') {
           invalidTokens.push(tokens[idx]);
         }
       }
     });
     await disableTokens(invalidTokens);
+    if (invalidTokens.length) {
+      emitLog({
+        level: 'warn',
+        message: 'Disabled invalid push tokens',
+        type: 'push',
+        invalidTokenCount: invalidTokens.length
+      });
+    }
+    return {
+      attempted: tokens.length,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+      invalidTokens,
+      failureCodes
+    };
   } catch (err) {
-    console.error('[PushService] Batch send failed:', err);
+    emitLog({
+      level: 'error',
+      message: 'Push multicast failed',
+      type: 'push',
+      attempted: tokens.length,
+      error: { message: err.message, stack: err.stack }
+    });
+    return {
+      attempted: tokens.length,
+      successCount: 0,
+      failureCount: tokens.length,
+      invalidTokens: [],
+      failureCodes: [err.message]
+    };
   }
 };
 
@@ -73,7 +117,7 @@ const sendPushToRole = async ({ branchId, role, title, body, data }) => {
     },
     data: normalizeData(data)
   };
-  await sendToTokens(tokens, payload);
+  return sendToTokens(tokens, payload);
 };
 
 const sendPushToUser = async ({ userId, title, body, data }) => {
@@ -105,7 +149,7 @@ const sendPushToUser = async ({ userId, title, body, data }) => {
     },
     data: normalizeData(data)
   };
-  await sendToTokens(tokens, payload);
+  return sendToTokens(tokens, payload);
 };
 
 module.exports = { isConfigured, getPublicKey, sendPushToRole, sendPushToUser };

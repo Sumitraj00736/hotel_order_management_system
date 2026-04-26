@@ -1,15 +1,76 @@
 let ioInstance = null;
+const { resolveUserSession } = require('../auth/session');
+const { pickActiveMembership } = require('../branch/access');
+
+const resolveSocketRooms = ({ user, memberships, branchId }) => {
+  const branchAccess = pickActiveMembership({
+    memberships: (memberships || []).map((membership) => ({
+      branchId: membership.branchId?.toString?.() || membership.branchId,
+      role: membership.role,
+      permissions: membership.permissions || [],
+      active: membership.active,
+      status: membership.status
+    })),
+    requestedBranchId: branchId
+  });
+
+  if (branchAccess.error) {
+    return branchAccess;
+  }
+
+  const effectiveBranchId = String(branchAccess.active.branchId);
+  const roles = Array.from(
+    new Set([
+      String(branchAccess.active.role || '').toLowerCase(),
+      String(user?.role || '').toLowerCase()
+    ].filter(Boolean))
+  );
+  const rooms = roles.flatMap((role) => [`role:${role}:branch:${effectiveBranchId}`, `role:${role}`]);
+
+  return {
+    branchId: effectiveBranchId,
+    roles,
+    rooms
+  };
+};
 
 const attachSocket = (io) => {
   ioInstance = io;
 
-  io.on('connection', (socket) => {
-    socket.on('join-role', ({ role, branchId }) => {
-      if (role && branchId) {
-        socket.join(`role:${role}:branch:${branchId}`);
-      } else if (role) {
-        socket.join(`role:${role}`);
+  io.use(async (socket, next) => {
+    try {
+      const authHeader = socket.handshake.headers?.authorization || '';
+      const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      const token = socket.handshake.auth?.token || bearerToken;
+      const session = await resolveUserSession(token);
+      if (session.error) {
+        return next(new Error(session.error));
       }
+      socket.user = session.user;
+      socket.memberships = session.memberships || [];
+      return next();
+    } catch (error) {
+      return next(new Error(`Socket authentication failed: ${error.message}`));
+    }
+  });
+
+  io.on('connection', (socket) => {
+    socket.on('join-role', ({ branchId } = {}) => {
+      const resolved = resolveSocketRooms({
+        user: socket.user,
+        memberships: socket.memberships,
+        branchId
+      });
+
+      if (resolved.error) {
+        socket.emit('socket:error', { message: resolved.error, branches: resolved.branches || [] });
+        return;
+      }
+
+      for (const room of resolved.rooms) {
+        socket.join(room);
+      }
+      socket.emit('socket:joined', { branchId: resolved.branchId, roles: resolved.roles });
     });
   });
 };
@@ -50,4 +111,4 @@ const emitTableUpdate = (table) => {
   }
 };
 
-module.exports = { attachSocket, emitNewOrder, emitOrderUpdate, emitNotification, emitTableUpdate };
+module.exports = { attachSocket, resolveSocketRooms, emitNewOrder, emitOrderUpdate, emitNotification, emitTableUpdate };

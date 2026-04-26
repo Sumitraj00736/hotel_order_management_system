@@ -1,9 +1,11 @@
 const ActivityLog = require('../../models/notifications/ActivityLog');
 
 const listActivityLogs = async (req, res) => {
-  const { type, dateFrom, dateTo, search, page = 1, limit = 50 } = req.query;
+  const { type, action, entityType, dateFrom, dateTo, search, page = 1, limit = 50 } = req.query;
   const filter = { branchId: req.branchId };
   if (type) filter.type = type;
+  if (action) filter.action = action;
+  if (entityType) filter.entityType = entityType;
   if (dateFrom || dateTo) {
     filter.createdAt = {};
     if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);

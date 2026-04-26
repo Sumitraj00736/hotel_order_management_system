@@ -1,7 +1,12 @@
+const mongoose = require('mongoose');
 const Ingredient = require('../../models/inventory/Ingredient');
 const IngredientUnit = require('../../models/inventory/IngredientUnit');
 const Recipe = require('../../models/menu/Recipe');
 const StockTransaction = require('../../models/inventory/StockTransaction');
+const MenuItem = require('../../models/menu/MenuItem');
+
+const roundAmount = (value) => Math.round(Number(value || 0) * 100) / 100;
+const branchFilter = (req) => (req.branchId ? { branchId: req.branchId } : {});
 
 const listIngredients = async (req, res) => {
   const filter = {};
@@ -88,11 +93,19 @@ const updateIngredientUnit = async (req, res) => {
 
 const deleteIngredientUnit = async (req, res) => {
   try {
-    const unit = await IngredientUnit.findOneAndDelete({
+    const unit = await IngredientUnit.findOne({
       _id: req.params.id,
-      ...(req.branchId ? { branchId: req.branchId } : {})
+      ...branchFilter(req)
     });
     if (!unit) return res.status(404).json({ message: 'Unit not found' });
+    const ingredientUsingUnit = await Ingredient.exists({
+      unit: unit.name,
+      ...branchFilter(req)
+    });
+    if (ingredientUsingUnit) {
+      return res.status(409).json({ message: 'Cannot delete unit that is used by ingredients' });
+    }
+    await IngredientUnit.deleteOne({ _id: unit._id, ...branchFilter(req) });
     return res.json({ message: 'Unit deleted successfully' });
   } catch (error) {
     return res.status(400).json({ message: 'Delete unit failed', error: error.message });
@@ -100,49 +113,108 @@ const deleteIngredientUnit = async (req, res) => {
 };
 
 const createIngredient = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
-    const { name, unit, currentStock = 0, reorderLevel = 0, sku, defaultPrice, group, openingQty, openingRate } = req.body;
-    const oQty = Number(openingQty || 0);
-    const oRate = Number(openingRate || 0);
-    const ingredient = await Ingredient.create({
-      name,
-      unit,
-      currentStock: Number(currentStock),
-      initialStock: Number(currentStock),
-      reorderLevel: Number(reorderLevel),
-      sku,
-      branchId: req.branchId,
-      defaultPrice: Number(defaultPrice || 0),
-      group: group || undefined,
-      openingQty: oQty,
-      openingRate: oRate,
-      openingValue: Math.round(oQty * oRate * 100) / 100
+    let ingredient;
+    await session.withTransaction(async () => {
+      const { name, unit, currentStock = 0, reorderLevel = 0, sku, defaultPrice, group, openingQty, openingRate } = req.body;
+      const oQty = Number(openingQty ?? currentStock ?? 0);
+      const oRate = Number(openingRate || defaultPrice || 0);
+      const openingValue = roundAmount(oQty * oRate);
+      [ingredient] = await Ingredient.create([{
+        name,
+        unit,
+        currentStock: Number(currentStock),
+        initialStock: Number(currentStock),
+        reorderLevel: Number(reorderLevel),
+        sku,
+        branchId: req.branchId,
+        defaultPrice: Number(defaultPrice || 0),
+        group: group || undefined,
+        openingQty: oQty,
+        openingRate: oRate,
+        openingValue
+      }], { session });
+
+      if (Number(currentStock) > 0) {
+        await StockTransaction.create([{
+          branchId: req.branchId,
+          ingredient: ingredient._id,
+          delta: Number(currentStock),
+          reason: 'adjustment',
+          unitCost: Number(defaultPrice || openingRate || 0),
+          totalCost: openingValue,
+          note: 'Opening stock entry',
+          createdBy: req.user?._id
+        }], { session });
+      }
     });
     return res.status(201).json(ingredient);
   } catch (error) {
     return res.status(400).json({ message: 'Create ingredient failed', error: error.message });
+  } finally {
+    session.endSession();
   }
 };
 
 const updateIngredient = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
-    const allowedFields = ['name', 'unit', 'currentStock', 'reorderLevel', 'sku', 'defaultPrice', 'group', 'openingQty', 'openingRate'];
-    const updates = allowedFields.reduce((acc, key) => {
-      if (req.body[key] !== undefined) acc[key] = req.body[key];
-      return acc;
-    }, {});
-    if (updates.openingQty !== undefined || updates.openingRate !== undefined) {
-      const oQty = Number(updates.openingQty ?? 0);
-      const oRate = Number(updates.openingRate ?? 0);
-      updates.openingValue = Math.round(oQty * oRate * 100) / 100;
-    }
-    const ingredient = await Ingredient.findByIdAndUpdate(req.params.id, updates, { new: true });
-    if (!ingredient) {
-      return res.status(404).json({ message: 'Ingredient not found' });
-    }
+    let ingredient;
+    await session.withTransaction(async () => {
+      const existing = await Ingredient.findOne({
+        _id: req.params.id,
+        ...branchFilter(req)
+      }).session(session);
+      if (!existing) {
+        throw new Error('Ingredient not found');
+      }
+
+      const allowedFields = ['name', 'unit', 'currentStock', 'reorderLevel', 'sku', 'defaultPrice', 'group', 'openingQty', 'openingRate'];
+      const updates = allowedFields.reduce((acc, key) => {
+        if (req.body[key] !== undefined) acc[key] = req.body[key];
+        return acc;
+      }, {});
+      if (updates.openingQty !== undefined || updates.openingRate !== undefined) {
+        const oQty = Number(updates.openingQty ?? existing.openingQty ?? 0);
+        const oRate = Number(updates.openingRate ?? existing.openingRate ?? 0);
+        updates.openingValue = roundAmount(oQty * oRate);
+      }
+
+      const hasStockChange = updates.currentStock !== undefined;
+      const previousStock = Number(existing.currentStock || 0);
+      const nextStock = hasStockChange ? Number(updates.currentStock || 0) : previousStock;
+      if (hasStockChange && nextStock < 0) {
+        throw new Error('currentStock cannot be negative');
+      }
+
+      ingredient = await Ingredient.findOneAndUpdate(
+        { _id: req.params.id, ...branchFilter(req) },
+        updates,
+        { new: true, session }
+      );
+
+      if (hasStockChange) {
+        const delta = roundAmount(nextStock - previousStock);
+        if (delta !== 0) {
+          await StockTransaction.create([{
+            branchId: req.branchId,
+            ingredient: ingredient._id,
+            delta,
+            reason: 'adjustment',
+            unitCost: Number(ingredient.defaultPrice || 0),
+            totalCost: roundAmount(Math.abs(delta) * Number(ingredient.defaultPrice || 0)),
+            note: 'Manual stock adjustment from ingredient update',
+            createdBy: req.user?._id
+          }], { session });
+        }
+      }
+    });
     return res.json(ingredient);
   } catch (error) {
-    return res.status(400).json({ message: 'Update ingredient failed', error: error.message });
+    return res.status(error.message === 'Ingredient not found' ? 404 : 400).json({ message: 'Update ingredient failed', error: error.message });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -156,14 +228,14 @@ const restockIngredient = async (req, res) => {
     if (!ingredient) {
       return res.status(404).json({ message: 'Ingredient not found' });
     }
-    ingredient.currentStock += amount;
+    ingredient.currentStock += Number(amount);
     ingredient.lastRestockedAt = new Date();
     await ingredient.save();
 
     await StockTransaction.create({
       branchId: req.branchId,
       ingredient: ingredient._id,
-      delta: amount,
+      delta: Number(amount),
       reason: 'restock',
       note,
       createdBy: req.user?._id
@@ -192,6 +264,18 @@ const setRecipe = async (req, res) => {
     const { menuItem, ingredients } = req.body;
     if (!menuItem || !Array.isArray(ingredients) || ingredients.length === 0) {
       return res.status(400).json({ message: 'Menu item and ingredients are required' });
+    }
+    const menu = await MenuItem.findOne({ _id: menuItem, ...branchFilter(req) }).select('_id');
+    if (!menu) {
+      return res.status(404).json({ message: 'Menu item not found for branch' });
+    }
+    const ingredientIds = ingredients.map((i) => i.ingredient).filter(Boolean);
+    const ingredientDocs = await Ingredient.find({
+      _id: { $in: ingredientIds },
+      ...branchFilter(req)
+    }).select('_id');
+    if (ingredientDocs.length !== ingredientIds.length) {
+      return res.status(400).json({ message: 'One or more ingredients do not belong to this branch' });
     }
     const sanitized = ingredients.map((i) => ({
       ingredient: i.ingredient,
@@ -233,16 +317,28 @@ const listRecipes = async (req, res) => {
 
 const deleteIngredient = async (req, res) => {
   try {
-    const ingredient = await Ingredient.findOneAndDelete({
+    const ingredient = await Ingredient.findOne({
       _id: req.params.id,
-      ...(req.branchId ? { branchId: req.branchId } : {})
+      ...branchFilter(req)
     });
     if (!ingredient) {
       return res.status(404).json({ message: 'Ingredient not found' });
     }
-    // Also delete recipes referencing this ingredient? 
-    // Usually better to just warn or keep them but with a "missing" flag.
-    // For now, let's just delete the ingredient.
+    const recipeUsingIngredient = await Recipe.exists({
+      'ingredients.ingredient': ingredient._id,
+      ...branchFilter(req)
+    });
+    if (recipeUsingIngredient) {
+      return res.status(409).json({ message: 'Cannot delete ingredient that is used in recipes' });
+    }
+    const stockHistoryExists = await StockTransaction.exists({
+      ingredient: ingredient._id,
+      ...branchFilter(req)
+    });
+    if (stockHistoryExists) {
+      return res.status(409).json({ message: 'Cannot delete ingredient with stock transaction history' });
+    }
+    await Ingredient.deleteOne({ _id: ingredient._id, ...branchFilter(req) });
     return res.json({ message: 'Ingredient deleted successfully' });
   } catch (error) {
     return res.status(400).json({ message: 'Delete ingredient failed', error: error.message });

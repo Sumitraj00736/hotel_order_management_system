@@ -1,6 +1,6 @@
 const Order = require('../../models/orders/Order');
 const Table = require('../../models/tables/Table');
-const CustomerHistory = require('../../models/customers/CustomerHistory');
+const SalesInvoice = require('../../models/finance/SalesInvoice');
 const Purchase = require('../../models/finance/Purchase');
 const Expense = require('../../models/finance/Expense');
 const Income = require('../../models/finance/Income');
@@ -31,15 +31,16 @@ const TRANSACTION_MERGE_CAP = 12000;
 const mapTransactionRows = async ({ branchId, dateFrom, dateTo, limit = 50, page = 1 }) => {
   const branchMatch = branchId ? { branchId } : {};
   const salesMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
+  const invoiceMatch = { ...branchMatch, status: 'active', ...buildRangeMatch('closedAt', dateFrom, dateTo) };
   const purchaseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
   const expenseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
-  const incomeMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
-  const paymentMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
-  const salesReturnMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
-  const purchaseReturnMatch = { ...branchMatch, ...buildRangeMatch('billDate', dateFrom, dateTo) };
+  const incomeMatch = { ...branchMatch, status: 'active', ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+  const paymentMatch = { ...branchMatch, status: 'active', ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+  const salesReturnMatch = { ...branchMatch, status: 'active', ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+  const purchaseReturnMatch = { ...branchMatch, status: 'active', ...buildRangeMatch('billDate', dateFrom, dateTo) };
 
   const [
-    sales,
+    invoices,
     purchases,
     expenses,
     incomes,
@@ -54,23 +55,23 @@ const mapTransactionRows = async ({ branchId, dateFrom, dateTo, limit = 50, page
     salesReturnCount,
     purchaseReturnCount
   ] = await Promise.all([
-    CustomerHistory.find(salesMatch).sort({ paidAt: -1 }).lean(),
-    Purchase.find(purchaseMatch).sort({ paidAt: -1 }).lean(),
-    Expense.find(expenseMatch).sort({ paidAt: -1 }).lean(),
+    SalesInvoice.find(invoiceMatch).sort({ closedAt: -1 }).lean(),
+    Purchase.find({ ...purchaseMatch, status: 'active' }).sort({ paidAt: -1 }).lean(),
+    Expense.find({ ...expenseMatch, status: 'active' }).sort({ paidAt: -1 }).lean(),
     Income.find(incomeMatch).sort({ txnDate: -1 }).lean(),
     Payment.find(paymentMatch).sort({ txnDate: -1 }).lean(),
     SalesReturn.find(salesReturnMatch).sort({ txnDate: -1 }).lean(),
     PurchaseReturn.find(purchaseReturnMatch).sort({ billDate: -1 }).lean(),
-    CustomerHistory.countDocuments(salesMatch),
-    Purchase.countDocuments(purchaseMatch),
-    Expense.countDocuments(expenseMatch),
+    SalesInvoice.countDocuments(invoiceMatch),
+    Purchase.countDocuments({ ...purchaseMatch, status: 'active' }),
+    Expense.countDocuments({ ...expenseMatch, status: 'active' }),
     Income.countDocuments(incomeMatch),
     Payment.countDocuments(paymentMatch),
     SalesReturn.countDocuments(salesReturnMatch),
     PurchaseReturn.countDocuments(purchaseReturnMatch)
   ]);
 
-  const tableNums = [...new Set(sales.map((r) => r.tableNumber).filter((n) => n != null && n !== ''))];
+  const tableNums = [...new Set(invoices.map((r) => r.tableNumber).filter((n) => n != null && n !== ''))];
   let tableLabelMap = new Map();
   if (branchId && tableNums.length) {
     const tables = await Table.find({
@@ -106,17 +107,17 @@ const mapTransactionRows = async ({ branchId, dateFrom, dateTo, limit = 50, page
   const users = userIds.length ? await User.find({ _id: { $in: userIds } }).select('name') : [];
   const userMap = new Map(users.map((u) => [u._id.toString(), u.name]));
 
-  const salesRows = sales.map((row) => ({
+  const salesRows = invoices.map((row) => ({
     entryDate: row.createdAt,
-    txnDate: row.paidAt,
+    txnDate: row.closedAt,
     txnNo: row.invoiceNo || row.orderId?.toString() || '-',
     particular: particularForSale(row),
     txnType: 'Sales',
     parties: row.customerName || '-',
-    paymentMode: row.paymentMethod || '-',
-    amount: row.finalAmount || row.totalAmount || 0,
-    status: 'paid',
-    entryBy: row.waiter?.name || 'System'
+    paymentMode: row.paymentMethods?.length > 1 ? 'split' : row.paymentMethods?.[0] || '-',
+    amount: row.grandTotal || 0,
+    status: row.paymentStatus || 'paid',
+    entryBy: row.waiterName || 'System'
   }));
 
   const purchaseRows = purchases.map((row) => ({
@@ -293,18 +294,18 @@ const orderDashboard = async (req, res) => {
       { $group: { _id: null, totalDiscount: { $sum: '$discountAmount' } } }
     ]);
 
-    const topTableAgg = await CustomerHistory.aggregate([
-      { $match: branchMatch },
-      { $group: { _id: '$tableNumber', sales: { $sum: '$totalAmount' } } },
+    const topTableAgg = await SalesInvoice.aggregate([
+      { $match: { ...branchMatch, status: 'active' } },
+      { $group: { _id: '$tableNumber', sales: { $sum: '$grandTotal' } } },
       { $sort: { sales: -1 } },
       { $limit: 1 }
     ]);
 
-    const orderSeries = await CustomerHistory.aggregate([
-      { $match: branchMatch },
+    const orderSeries = await SalesInvoice.aggregate([
+      { $match: { ...branchMatch, status: 'active' } },
       {
         $group: {
-          _id: { year: { $year: '$paidAt' }, month: { $month: '$paidAt' } },
+          _id: { year: { $year: '$closedAt' }, month: { $month: '$closedAt' } },
           orders: { $sum: 1 }
         }
       },
@@ -345,22 +346,22 @@ const orderDashboard = async (req, res) => {
 const overviewDashboard = async (req, res) => {
   try {
     const branchMatch = req.branchId ? { branchId: req.branchId } : {};
-    const staffAgg = await CustomerHistory.aggregate([
-      { $match: { ...branchMatch, 'waiter.id': { $ne: null } } },
-      { $group: { _id: '$waiter.id', name: { $first: '$waiter.name' }, sales: { $sum: '$totalAmount' } } },
+    const staffAgg = await SalesInvoice.aggregate([
+      { $match: { ...branchMatch, status: 'active', waiterId: { $ne: null } } },
+      { $group: { _id: '$waiterId', name: { $first: '$waiterName' }, sales: { $sum: '$grandTotal' } } },
       { $sort: { sales: -1 } },
       { $limit: 5 }
     ]);
 
-    const topCustomers = await CustomerHistory.aggregate([
-      { $match: branchMatch },
-      { $group: { _id: '$customerName', orders: { $sum: 1 }, total: { $sum: '$totalAmount' } } },
+    const topCustomers = await SalesInvoice.aggregate([
+      { $match: { ...branchMatch, status: 'active', customerName: { $nin: [null, ''] } } },
+      { $group: { _id: '$customerName', orders: { $sum: 1 }, total: { $sum: '$grandTotal' } } },
       { $sort: { total: -1 } },
       { $limit: 5 }
     ]);
 
-    const topDishes = await CustomerHistory.aggregate([
-      { $match: branchMatch },
+    const topDishes = await SalesInvoice.aggregate([
+      { $match: { ...branchMatch, status: 'active' } },
       { $unwind: '$items' },
       { $group: { _id: '$items.name', qty: { $sum: '$items.quantity' } } },
       { $sort: { qty: -1 } },
@@ -391,24 +392,24 @@ const financeDashboard = async (req, res) => {
     const branchMatch = req.branchId ? { branchId: req.branchId } : {};
     const { dateFrom, dateTo } = buildDateRange(req);
 
-    const salesMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
+    const invoiceMatch = { ...branchMatch, status: 'active', ...buildRangeMatch('closedAt', dateFrom, dateTo) };
     const purchaseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
     const expenseMatch = { ...branchMatch, ...buildRangeMatch('paidAt', dateFrom, dateTo) };
-    const incomeMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
-    const paymentMatch = { ...branchMatch, ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+    const incomeMatch = { ...branchMatch, status: 'active', ...buildRangeMatch('txnDate', dateFrom, dateTo) };
+    const paymentMatch = { ...branchMatch, status: 'active', ...buildRangeMatch('txnDate', dateFrom, dateTo) };
 
-    const [sales, purchases, expenses, incomes, paymentInAgg, paymentOutAgg] = await Promise.all([
-      CustomerHistory.aggregate([
-        { $match: salesMatch },
+    const [sales, purchases, expenses, incomes, paymentInAgg, paymentOutAgg, paymentBreakdownAgg] = await Promise.all([
+      SalesInvoice.aggregate([
+        { $match: { ...invoiceMatch } },
         {
           $group: {
             _id: null,
-            total: { $sum: { $ifNull: ['$finalAmount', '$totalAmount'] } }
+            total: { $sum: '$grandTotal' }
           }
         }
       ]),
-      Purchase.aggregate([{ $match: purchaseMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-      Expense.aggregate([{ $match: expenseMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      Purchase.aggregate([{ $match: { ...purchaseMatch, status: 'active' } }, { $group: { _id: null, total: { $sum: { $ifNull: ['$grandTotal', '$amount'] } } } }]),
+      Expense.aggregate([{ $match: { ...expenseMatch, status: 'active' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       Income.aggregate([{ $match: incomeMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
       Payment.aggregate([
         { $match: { ...paymentMatch, direction: 'in' } },
@@ -417,6 +418,11 @@ const financeDashboard = async (req, res) => {
       Payment.aggregate([
         { $match: { ...paymentMatch, direction: 'out' } },
         { $group: { _id: null, total: { $sum: '$amount' } } }
+      ]),
+      Payment.aggregate([
+        { $match: { ...paymentMatch, direction: 'in' } },
+        { $group: { _id: '$paymentMethod', amount: { $sum: '$amount' } } },
+        { $sort: { amount: -1, _id: 1 } }
       ])
     ]);
 
@@ -427,12 +433,12 @@ const financeDashboard = async (req, res) => {
     const paymentIn = paymentInAgg[0]?.total || 0;
     const paymentOut = paymentOutAgg[0]?.total || 0;
 
-    const salesSeries = await CustomerHistory.aggregate([
-      { $match: salesMatch },
+    const salesSeries = await SalesInvoice.aggregate([
+      { $match: { ...invoiceMatch } },
       {
         $group: {
-          _id: { year: { $year: '$paidAt' }, month: { $month: '$paidAt' } },
-          sales: { $sum: { $ifNull: ['$finalAmount', '$totalAmount'] } }
+          _id: { year: { $year: '$closedAt' }, month: { $month: '$closedAt' } },
+          sales: { $sum: '$grandTotal' }
         }
       },
       { $sort: { '_id.year': 1, '_id.month': 1 } }
@@ -440,6 +446,10 @@ const financeDashboard = async (req, res) => {
     const formattedSalesSeries = salesSeries.map((row) => ({
       month: `${row._id.month}/${row._id.year}`,
       sales: row.sales
+    }));
+    const paymentBreakdown = paymentBreakdownAgg.map((row) => ({
+      method: row._id || 'cash',
+      amount: row.amount || 0
     }));
 
     return res.json({
@@ -451,7 +461,8 @@ const financeDashboard = async (req, res) => {
         paymentIn,
         paymentOut
       },
-      salesSeries: formattedSalesSeries
+      salesSeries: formattedSalesSeries,
+      paymentBreakdown
     });
   } catch (error) {
     return res.status(500).json({ message: 'Finance dashboard failed', error: error.message });

@@ -9,6 +9,11 @@ const { emitNewOrder, emitOrderUpdate, emitTableUpdate } = require('../../utils/
 const { notifyRole, notifyUser } = require('../../utils/notifications/notify');
 const { logActivity } = require('../../utils/notifications/activity');
 const { nextSequence } = require('../../utils/common/counter');
+const { computeOrderInvoiceTotals } = require('../../utils/finance/calculations');
+const {
+  isEditableOrderStatus,
+  isAllowedOrderStatusTransition
+} = require('../../utils/orders/lifecycle');
 
 const buildOrderItems = async (items, branchId) => {
   const menuIds = items.map((item) => item.menuItem);
@@ -412,36 +417,48 @@ const updateOrder = async (req, res) => {
     session = await Order.startSession();
     session.startTransaction();
 
-    const order = await Order.findById(req.params.id).session(session);
+    const order = await Order.findOne({
+      _id: req.params.id,
+      ...(req.branchId ? { branchId: req.branchId } : {})
+    }).session(session);
     if (!order) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    if (order.status === 'paid') {
+    if (!isEditableOrderStatus(order.status)) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ message: 'Paid orders cannot be edited' });
+      return res.status(400).json({ message: `Orders in status "${order.status}" cannot be edited` });
     }
 
     const changes = [];
     if (req.body.table) {
-      const newTable = await Table.findById(req.body.table).session(session);
+      const newTable = await Table.findOne({
+        _id: req.body.table,
+        ...(req.branchId ? { branchId: req.branchId } : {})
+      }).session(session);
       if (!newTable) {
         await session.abortTransaction();
         session.endSession();
         return res.status(404).json({ message: 'Table not found' });
       }
-      if (newTable.status === 'occupied' && order.table.toString() !== newTable._id.toString()) {
+      if (newTable.status === 'occupied' && order.table?.toString() !== newTable._id.toString()) {
         await session.abortTransaction();
         session.endSession();
         return res.status(400).json({ message: 'Table already occupied' });
       }
 
       // Free previous table when moving
-      if (order.table.toString() !== newTable._id.toString()) {
-        await Table.findByIdAndUpdate(order.table, { status: 'available' }, { session });
+      if (order.table?.toString() !== newTable._id.toString()) {
+        if (order.table) {
+          await Table.findOneAndUpdate(
+            { _id: order.table, ...(req.branchId ? { branchId: req.branchId } : {}) },
+            { status: 'available' },
+            { session }
+          );
+        }
         newTable.status = 'occupied';
         await newTable.save({ session });
       }
@@ -519,16 +536,19 @@ const updateOrder = async (req, res) => {
       await applyInventoryDelta(existingItems, orderItems, order._id, req.user?._id, session);
       order.items = orderItems;
       order.totalAmount = totalAmount;
-      order.subTotal = totalAmount;  // Sync subTotal so payBill uses correct base
-      
-      // Recalculate finalAmount preserving any existing discount/tax
-      const discountAmt = order.discountType === 'percent' 
-        ? (totalAmount * (order.discountValue || 0)) / 100 
-        : (order.discountValue || 0);
-      const taxableAmount = Math.max(0, totalAmount - discountAmt);
-      const taxAmount = (taxableAmount * (order.taxRate || 0)) / 100;
-      order.taxableAmount = taxableAmount;  // Sync taxableAmount for correct bill display
-      order.finalAmount = Math.max(0, taxableAmount + taxAmount + (order.tipsAmount || 0) + (order.roundOff || 0));
+      const totals = computeOrderInvoiceTotals({
+        subTotal: totalAmount,
+        discountType: order.discountType,
+        discountValue: order.discountValue,
+        taxRate: order.taxRate,
+        tipsAmount: order.tipsAmount,
+        roundOff: order.roundOff
+      });
+      order.subTotal = totals.subTotal;
+      order.discountAmount = totals.discountAmount;
+      order.taxableAmount = totals.taxableAmount;
+      order.taxAmount = totals.taxAmount;
+      order.finalAmount = totals.grandTotal;
       
       changes.push('items updated');
     }
@@ -569,6 +589,11 @@ const updateOrder = async (req, res) => {
       if (req.body.status === 'paid') {
         return res.status(400).json({ message: 'Use billing to mark orders as paid' });
       }
+      if (!isAllowedOrderStatusTransition(req.body.status)) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({ message: 'Invalid order status transition' });
+      }
       order.status = req.body.status;
       changes.push(`status -> ${req.body.status}`);
     }
@@ -579,8 +604,12 @@ const updateOrder = async (req, res) => {
 
     await order.save({ session });
 
-    if (order.status === 'paid' || order.status === 'cancelled') {
-      await Table.findByIdAndUpdate(order.table, { status: 'available' });
+    if (order.status === 'cancelled' && order.table) {
+      await Table.findOneAndUpdate(
+        { _id: order.table, ...(req.branchId ? { branchId: req.branchId } : {}) },
+        { status: 'available' },
+        { session }
+      );
     }
 
     const populated = await Order.findById(order._id)
@@ -641,17 +670,20 @@ const updateOrderStatus = async (req, res) => {
     session = await Order.startSession();
     session.startTransaction();
 
-    const order = await Order.findById(req.params.id).session(session);
+    const order = await Order.findOne({
+      _id: req.params.id,
+      ...(req.branchId ? { branchId: req.branchId } : {})
+    }).session(session);
     if (!order) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    if (order.status === 'paid') {
+    if (!isEditableOrderStatus(order.status)) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ message: 'Paid orders cannot be updated' });
+      return res.status(400).json({ message: `Orders in status "${order.status}" cannot be updated` });
     }
 
     if (req.user.role === 'kitchen' && !order.kitchenAssigned) {
@@ -663,12 +695,22 @@ const updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: 'Use billing to mark orders as paid' });
     }
 
+    if (!isAllowedOrderStatusTransition(req.body.status)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: 'Invalid order status transition' });
+    }
+
     order.status = req.body.status;
     order.editLogs.push({ editedBy: req.user._id, changes: `status -> ${req.body.status}` });
     await order.save({ session });
 
-    if (order.status === 'paid' || order.status === 'cancelled') {
-      await Table.findByIdAndUpdate(order.table, { status: 'available' }, { session });
+    if (order.status === 'cancelled' && order.table) {
+      await Table.findOneAndUpdate(
+        { _id: order.table, ...(req.branchId ? { branchId: req.branchId } : {}) },
+        { status: 'available' },
+        { session }
+      );
     }
 
     await session.commitTransaction();

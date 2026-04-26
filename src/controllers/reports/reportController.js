@@ -1,8 +1,12 @@
 const Order = require('../../models/orders/Order');
-const CustomerHistory = require('../../models/customers/CustomerHistory');
 const User = require('../../models/users/User');
+const SalesInvoice = require('../../models/finance/SalesInvoice');
+const UserBranchRole = require('../../models/users/UserBranchRole');
+const OrderModel = require('../../models/orders/Order');
 const Purchase = require('../../models/finance/Purchase');
 const Expense = require('../../models/finance/Expense');
+const Income = require('../../models/finance/Income');
+const Payment = require('../../models/finance/Payment');
 const { getCache, setCache } = require('../../utils/performance/cache');
 
 const buildSummaryData = async ({ branchId, dateFrom, dateTo }) => {
@@ -12,40 +16,42 @@ const buildSummaryData = async ({ branchId, dateFrom, dateTo }) => {
 
   const totalOrders = await Order.countDocuments(filter);
 
-  const paidMatch = {
-    ...filter,
-    $or: [{ status: 'paid' }, { paymentStatus: 'paid' }]
+  const invoiceMatch = {
+    ...(branchId ? { branchId } : {}),
+    status: 'active'
   };
   if (hasDateFilter) {
-    paidMatch.paidAt = {};
-    if (dateFrom) paidMatch.paidAt.$gte = new Date(dateFrom);
-    if (dateTo) paidMatch.paidAt.$lte = new Date(dateTo);
+    invoiceMatch.closedAt = {};
+    if (dateFrom) invoiceMatch.closedAt.$gte = new Date(dateFrom);
+    if (dateTo) invoiceMatch.closedAt.$lte = new Date(dateTo);
   }
 
-  const paidAgg = await Order.aggregate([
-    { $match: paidMatch },
+  const invoiceAgg = await SalesInvoice.aggregate([
+    { $match: invoiceMatch },
     {
       $group: {
         _id: null,
-        totalSales: { $sum: { $ifNull: ['$finalAmount', '$totalAmount'] } },
+        totalSales: { $sum: '$grandTotal' },
+        amountPaid: { $sum: '$amountPaid' },
+        amountDue: { $sum: '$amountDue' },
         dineIn: {
           $sum: {
-            $cond: [{ $eq: ['$orderType', 'dine_in'] }, { $ifNull: ['$finalAmount', '$totalAmount'] }, 0]
+            $cond: [{ $eq: ['$orderType', 'dine_in'] }, '$grandTotal', 0]
           }
         },
         delivery: {
           $sum: {
-            $cond: [{ $eq: ['$orderType', 'delivery'] }, { $ifNull: ['$finalAmount', '$totalAmount'] }, 0]
+            $cond: [{ $eq: ['$orderType', 'delivery'] }, '$grandTotal', 0]
           }
         },
         takeaway: {
           $sum: {
-            $cond: [{ $eq: ['$orderType', 'takeaway'] }, { $ifNull: ['$finalAmount', '$totalAmount'] }, 0]
+            $cond: [{ $eq: ['$orderType', 'takeaway'] }, '$grandTotal', 0]
           }
         },
         reservation: {
           $sum: {
-            $cond: [{ $eq: ['$orderType', 'online'] }, { $ifNull: ['$finalAmount', '$totalAmount'] }, 0]
+            $cond: [{ $eq: ['$orderType', 'online'] }, '$grandTotal', 0]
           }
         }
       }
@@ -77,13 +83,14 @@ const buildSummaryData = async ({ branchId, dateFrom, dateTo }) => {
     return acc;
   }, {});
 
-  const totalSales = paidAgg[0]?.totalSales || 0;
-  const unpaidTotal = unpaidAgg[0]?.total || 0;
+  const totalSales = invoiceAgg[0]?.totalSales || 0;
+  const paidTotal = invoiceAgg[0]?.amountPaid || 0;
+  const unpaidTotal = invoiceAgg[0]?.amountDue || unpaidAgg[0]?.total || 0;
   const typeTotals = {
-    dineIn: paidAgg[0]?.dineIn || 0,
-    delivery: paidAgg[0]?.delivery || 0,
-    takeaway: paidAgg[0]?.takeaway || 0,
-    reservation: paidAgg[0]?.reservation || 0
+    dineIn: invoiceAgg[0]?.dineIn || 0,
+    delivery: invoiceAgg[0]?.delivery || 0,
+    takeaway: invoiceAgg[0]?.takeaway || 0,
+    reservation: invoiceAgg[0]?.reservation || 0
   };
 
   const purchaseMatch = branchId ? { branchId } : {};
@@ -97,25 +104,51 @@ const buildSummaryData = async ({ branchId, dateFrom, dateTo }) => {
   }
 
   const purchaseAgg = await Purchase.aggregate([
-    { $match: purchaseMatch },
-    { $group: { _id: null, total: { $sum: '$amount' } } }
+    { $match: { ...purchaseMatch, status: 'active' } },
+    { $group: { _id: null, total: { $sum: { $ifNull: ['$grandTotal', '$amount'] } } } }
   ]);
   const expenseAgg = await Expense.aggregate([
-    { $match: expenseMatch },
+    { $match: { ...expenseMatch, status: 'active' } },
+    { $group: { _id: null, total: { $sum: '$amount' } } }
+  ]);
+  const incomeAgg = await Income.aggregate([
+    { $match: { ...(branchId ? { branchId } : {}), status: 'active', ...(hasDateFilter ? { txnDate: purchaseMatch.paidAt } : {}) } },
+    { $group: { _id: null, total: { $sum: '$amount' } } }
+  ]);
+  const paymentInAgg = await Payment.aggregate([
+    {
+      $match: {
+        ...(branchId ? { branchId } : {}),
+        status: 'active',
+        direction: 'in',
+        ...(hasDateFilter ? { txnDate: purchaseMatch.paidAt } : {})
+      }
+    },
+    { $group: { _id: null, total: { $sum: '$amount' } } }
+  ]);
+  const paymentOutAgg = await Payment.aggregate([
+    {
+      $match: {
+        ...(branchId ? { branchId } : {}),
+        status: 'active',
+        direction: 'out',
+        ...(hasDateFilter ? { txnDate: purchaseMatch.paidAt } : {})
+      }
+    },
     { $group: { _id: null, total: { $sum: '$amount' } } }
   ]);
 
   const purchase = purchaseAgg[0]?.total || 0;
   const expenses = expenseAgg[0]?.total || 0;
-  const paymentIn = totalSales;
-  const paymentOut = purchase + expenses;
-  const income = paymentIn; // keep aligned with sales unless other income sources are added
+  const paymentIn = paymentInAgg[0]?.total || 0;
+  const paymentOut = paymentOutAgg[0]?.total || 0;
+  const income = incomeAgg[0]?.total || 0;
 
   return {
     totalOrders,
     totalSales,
     byStatus,
-    paid: totalSales,
+    paid: paidTotal,
     unpaid: unpaidTotal,
     dineIn: typeTotals.dineIn,
     delivery: typeTotals.delivery,
@@ -239,15 +272,15 @@ const lastNDays = (n) => {
 const buildMonthlySeries = async ({ months = 6, match = {} }) => {
   const startDate = monthsAgo(months - 1);
   const buckets = lastNMonths(months);
-  const aggregation = await CustomerHistory.aggregate([
-    { $match: { paidAt: { $gte: startDate }, ...match } },
+  const aggregation = await SalesInvoice.aggregate([
+    { $match: { status: 'active', closedAt: { $gte: startDate }, ...match } },
     {
       $group: {
         _id: {
-          year: { $year: '$paidAt' },
-          month: { $month: '$paidAt' }
+          year: { $year: '$closedAt' },
+          month: { $month: '$closedAt' }
         },
-        sales: { $sum: '$totalAmount' },
+        sales: { $sum: '$grandTotal' },
         orders: { $sum: 1 }
       }
     }
@@ -274,16 +307,106 @@ const buildDailySeries = async ({ days = 7, match = {} }) => {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - (days - 1));
   const buckets = lastNDays(days);
-  const aggregation = await CustomerHistory.aggregate([
-    { $match: { paidAt: { $gte: startDate }, ...match } },
+  const aggregation = await SalesInvoice.aggregate([
+    { $match: { status: 'active', closedAt: { $gte: startDate }, ...match } },
     {
       $group: {
         _id: {
-          year: { $year: '$paidAt' },
-          month: { $month: '$paidAt' },
-          day: { $dayOfMonth: '$paidAt' }
+          year: { $year: '$closedAt' },
+          month: { $month: '$closedAt' },
+          day: { $dayOfMonth: '$closedAt' }
         },
-        sales: { $sum: '$totalAmount' },
+        sales: { $sum: '$grandTotal' },
+        orders: { $sum: 1 }
+      }
+    }
+  ]);
+
+  const lookup = new Map(
+    aggregation.map((row) => {
+      const key = `${row._id.year}-${String(row._id.month).padStart(2, '0')}-${String(row._id.day).padStart(2, '0')}`;
+      return [key, { sales: row.sales, orders: row.orders }];
+    })
+  );
+
+  return buckets.map((bucket) => {
+    const data = lookup.get(bucket.key) || { sales: 0, orders: 0 };
+    return {
+      day: bucket.label,
+      sales: data.sales,
+      orders: data.orders
+    };
+  });
+};
+
+const buildKitchenMonthlySeries = async ({ months = 6, branchMatch = {}, kitchenId }) => {
+  const startDate = monthsAgo(months - 1);
+  const buckets = lastNMonths(months);
+  const aggregation = await SalesInvoice.aggregate([
+    { $match: { status: 'active', closedAt: { $gte: startDate }, ...branchMatch } },
+    {
+      $lookup: {
+        from: OrderModel.collection.name,
+        localField: 'orderId',
+        foreignField: '_id',
+        as: 'orderDoc'
+      }
+    },
+    { $unwind: { path: '$orderDoc', preserveNullAndEmptyArrays: false } },
+    { $match: { 'orderDoc.kitchenAssigned': kitchenId } },
+    {
+      $group: {
+        _id: {
+          year: { $year: '$closedAt' },
+          month: { $month: '$closedAt' }
+        },
+        sales: { $sum: '$grandTotal' },
+        orders: { $sum: 1 }
+      }
+    }
+  ]);
+
+  const lookup = new Map(
+    aggregation.map((row) => [
+      `${row._id.year}-${String(row._id.month).padStart(2, '0')}`,
+      { sales: row.sales, orders: row.orders }
+    ])
+  );
+
+  return buckets.map((bucket) => {
+    const data = lookup.get(bucket.key) || { sales: 0, orders: 0 };
+    return {
+      month: `${bucket.label} ${bucket.year}`,
+      sales: data.sales,
+      orders: data.orders
+    };
+  });
+};
+
+const buildKitchenDailySeries = async ({ days = 7, branchMatch = {}, kitchenId }) => {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - (days - 1));
+  const buckets = lastNDays(days);
+  const aggregation = await SalesInvoice.aggregate([
+    { $match: { status: 'active', closedAt: { $gte: startDate }, ...branchMatch } },
+    {
+      $lookup: {
+        from: OrderModel.collection.name,
+        localField: 'orderId',
+        foreignField: '_id',
+        as: 'orderDoc'
+      }
+    },
+    { $unwind: { path: '$orderDoc', preserveNullAndEmptyArrays: false } },
+    { $match: { 'orderDoc.kitchenAssigned': kitchenId } },
+    {
+      $group: {
+        _id: {
+          year: { $year: '$closedAt' },
+          month: { $month: '$closedAt' },
+          day: { $dayOfMonth: '$closedAt' }
+        },
+        sales: { $sum: '$grandTotal' },
         orders: { $sum: 1 }
       }
     }
@@ -318,60 +441,107 @@ const resolveNames = async (rows) => {
 };
 
 const buildPerformance = async (months, groupField, branchMatch) => {
-  const fieldId = `$${groupField}.id`;
-  const fieldName = `$${groupField}.name`;
-  const match = {
-    paidAt: { $gte: monthsAgo(months) },
-    [groupField + '.id']: { $ne: null },
-    ...branchMatch
-  };
-
-  const rows = await CustomerHistory.aggregate([
-    { $match: match },
-    {
-      $group: {
-        _id: fieldId,
-        name: { $first: fieldName },
-        orders: { $sum: 1 },
-        sales: { $sum: '$totalAmount' }
-      }
-    },
-    { $sort: { sales: -1 } }
-  ]);
+  let rows = [];
+  if (groupField === 'waiter') {
+    rows = await SalesInvoice.aggregate([
+      {
+        $match: {
+          status: 'active',
+          closedAt: { $gte: monthsAgo(months) },
+          waiterId: { $ne: null },
+          ...branchMatch
+        }
+      },
+      {
+        $group: {
+          _id: '$waiterId',
+          name: { $first: '$waiterName' },
+          orders: { $sum: 1 },
+          sales: { $sum: '$grandTotal' }
+        }
+      },
+      { $sort: { sales: -1 } }
+    ]);
+  } else {
+    rows = await SalesInvoice.aggregate([
+      { $match: { status: 'active', closedAt: { $gte: monthsAgo(months) }, ...branchMatch } },
+      {
+        $lookup: {
+          from: OrderModel.collection.name,
+          localField: 'orderId',
+          foreignField: '_id',
+          as: 'orderDoc'
+        }
+      },
+      { $unwind: { path: '$orderDoc', preserveNullAndEmptyArrays: false } },
+      { $match: { 'orderDoc.kitchenAssigned': { $ne: null } } },
+      {
+        $group: {
+          _id: '$orderDoc.kitchenAssigned',
+          orders: { $sum: 1 },
+          sales: { $sum: '$grandTotal' }
+        }
+      },
+      { $sort: { sales: -1 } }
+    ]);
+  }
   return resolveNames(rows);
+};
+
+const loadRoleUsers = async ({ branchId, role }) => {
+  if (branchId) {
+    const memberships = await UserBranchRole.find({
+      branchId,
+      role,
+      $or: [{ active: true }, { status: 'active' }]
+    }).select('userId');
+    const ids = [...new Set(memberships.map((m) => m.userId?.toString()).filter(Boolean))];
+    if (!ids.length) return [];
+    return User.find({ _id: { $in: ids } }).select('name');
+  }
+  return User.find({ role }).select('name');
 };
 
 const buildAnalyticsData = async ({ branchId }) => {
   const match = branchId ? { branchId } : {};
-  const totalSalesAgg = await CustomerHistory.aggregate([
-    { $match: match },
-    { $group: { _id: null, totalSales: { $sum: '$totalAmount' }, totalOrders: { $sum: 1 } } }
+  const totalSalesAgg = await SalesInvoice.aggregate([
+    { $match: { status: 'active', ...match } },
+    { $group: { _id: null, totalSales: { $sum: '$grandTotal' }, totalOrders: { $sum: 1 } } }
   ]);
   const totalSales = totalSalesAgg[0]?.totalSales || 0;
   const totalOrders = totalSalesAgg[0]?.totalOrders || 0;
 
-  const waiterRankingRaw = await CustomerHistory.aggregate([
-    { $match: { 'waiter.id': { $ne: null }, ...match } },
+  const waiterRankingRaw = await SalesInvoice.aggregate([
+    { $match: { status: 'active', waiterId: { $ne: null }, ...match } },
     {
       $group: {
-        _id: '$waiter.id',
-        name: { $first: '$waiter.name' },
+        _id: '$waiterId',
+        name: { $first: '$waiterName' },
         orders: { $sum: 1 },
-        sales: { $sum: '$totalAmount' },
+        sales: { $sum: '$grandTotal' },
         tablesBooked: { $sum: 1 }
       }
     },
     { $sort: { sales: -1 } }
   ]);
 
-  const kitchenRankingRaw = await CustomerHistory.aggregate([
-    { $match: { 'kitchen.id': { $ne: null }, ...match } },
+  const kitchenRankingRaw = await SalesInvoice.aggregate([
+    { $match: { status: 'active', ...match } },
+    {
+      $lookup: {
+        from: OrderModel.collection.name,
+        localField: 'orderId',
+        foreignField: '_id',
+        as: 'orderDoc'
+      }
+    },
+    { $unwind: { path: '$orderDoc', preserveNullAndEmptyArrays: false } },
+    { $match: { 'orderDoc.kitchenAssigned': { $ne: null } } },
     {
       $group: {
-        _id: '$kitchen.id',
-        name: { $first: '$kitchen.name' },
+        _id: '$orderDoc.kitchenAssigned',
         orders: { $sum: 1 },
-        sales: { $sum: '$totalAmount' },
+        sales: { $sum: '$grandTotal' },
         tablesBooked: { $sum: 1 }
       }
     },
@@ -381,8 +551,8 @@ const buildAnalyticsData = async ({ branchId }) => {
   const branchMatch = branchId ? { branchId } : {};
   const companyMonthly = await buildMonthlySeries({ months: 6, match: branchMatch });
 
-  const waiterList = await User.find({ role: 'waiter', ...(branchId ? { branchId } : {}) }).select('name');
-  const kitchenList = await User.find({ role: 'kitchen', ...(branchId ? { branchId } : {}) }).select('name');
+  const waiterList = await loadRoleUsers({ branchId, role: 'waiter' });
+  const kitchenList = await loadRoleUsers({ branchId, role: 'kitchen' });
 
   const waiterRanking = await resolveNames(waiterRankingRaw);
   const kitchenRanking = await resolveNames(kitchenRankingRaw);
@@ -391,15 +561,16 @@ const buildAnalyticsData = async ({ branchId }) => {
   for (const waiter of waiterList) {
     waiterMonthly[waiter._id] = await buildMonthlySeries({
       months: 6,
-      match: { 'waiter.id': waiter._id, ...branchMatch }
+      match: { waiterId: waiter._id, ...branchMatch }
     });
   }
 
   const kitchenMonthly = {};
   for (const kitchen of kitchenList) {
-    kitchenMonthly[kitchen._id] = await buildMonthlySeries({
+    kitchenMonthly[kitchen._id] = await buildKitchenMonthlySeries({
       months: 6,
-      match: { 'kitchen.id': kitchen._id, ...branchMatch }
+      branchMatch,
+      kitchenId: kitchen._id
     });
   }
 
@@ -407,15 +578,16 @@ const buildAnalyticsData = async ({ branchId }) => {
   for (const waiter of waiterList) {
     waiterDaily[waiter._id] = await buildDailySeries({
       days: 7,
-      match: { 'waiter.id': waiter._id, ...branchMatch }
+      match: { waiterId: waiter._id, ...branchMatch }
     });
   }
 
   const kitchenDaily = {};
   for (const kitchen of kitchenList) {
-    kitchenDaily[kitchen._id] = await buildDailySeries({
+    kitchenDaily[kitchen._id] = await buildKitchenDailySeries({
       days: 7,
-      match: { 'kitchen.id': kitchen._id, ...branchMatch }
+      branchMatch,
+      kitchenId: kitchen._id
     });
   }
 

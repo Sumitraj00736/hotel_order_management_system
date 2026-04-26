@@ -7,11 +7,12 @@ const { notifyRole, notifyUser } = require('../../utils/notifications/notify');
 const { logActivity } = require('../../utils/notifications/activity');
 const { nextSequence } = require('../../utils/common/counter');
 const {
-  computeOrderInvoiceTotals,
-  normalizePaymentBreakdown,
-  deriveSettlement,
   sanitizeAmount
 } = require('../../utils/finance/calculations');
+const {
+  buildCheckoutComputation,
+  buildPaymentDocuments
+} = require('../../utils/orders/checkout');
 
 const generateBill = async (req, res) => {
   const order = await Order.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })
@@ -111,35 +112,20 @@ const payBill = async (req, res) => {
       return res.status(400).json({ message: 'Order already paid' });
     }
 
-    // Adapt legacy single payment -> new payments array
-    const invoiceTotals = computeOrderInvoiceTotals({
-      subTotal: order.subTotal ?? order.totalAmount,
+    const checkout = buildCheckoutComputation({
+      order,
+      paymentMethod,
+      paymentStatus,
       discountType,
       discountValue,
       taxRate,
       tipsAmount,
-      roundOff
+      roundOff,
+      tenderAmount,
+      payments
     });
-
-    payments = normalizePaymentBreakdown(
-      payments ||
-        (paymentMethod
-          ? [{ method: paymentMethod, amount: tenderAmount || invoiceTotals.grandTotal }]
-          : []),
-      paymentMethod || 'cash'
-    );
-
-    if (payments.length === 1 && payments[0].amount === 0) {
-      payments[0].amount = invoiceTotals.grandTotal;
-    }
-
-    const totalPaid = sanitizeAmount(payments.reduce((sum, p) => sum + Number(p.amount || 0), 0));
-    const settlement = deriveSettlement({
-      grandTotal: invoiceTotals.grandTotal,
-      amountPaid: totalPaid,
-      requestedStatus: paymentStatus
-    });
-    const changeDue = sanitizeAmount(Math.max(0, totalPaid - invoiceTotals.grandTotal));
+    const { invoiceTotals, settlement, changeDue, totalPaid, resolvedPaymentMethod, paymentRemark } = checkout;
+    payments = checkout.payments;
     const finalPaymentStatus = settlement.paymentStatus;
 
     const invoiceSeq = await nextSequence(`invoice:${req.branchId}`);
@@ -150,15 +136,8 @@ const payBill = async (req, res) => {
     order.status = finalPaymentStatus === 'paid' ? 'paid' : order.status;
     order.paymentStatus = finalPaymentStatus;
     
-    if (payments.length === 1) {
-      order.paymentMethod = payments[0].method;
-    } else if (payments.length > 1) {
-      order.paymentMethod = 'other';
-    } else {
-      order.paymentMethod = paymentMethod || undefined;
-    }
-    
-    order.paymentRemark = payments.length > 0 ? `Paid using ${payments.map(p => p.method).join(', ')}` : 'Unpaid/Credit';
+    order.paymentMethod = resolvedPaymentMethod;
+    order.paymentRemark = paymentRemark;
     order.paidAt = new Date();
     order.paidBy = req.user._id;
     order.subTotal = invoiceTotals.subTotal;
@@ -228,33 +207,17 @@ const payBill = async (req, res) => {
 
     // 4. Create Payment Records
     if (settlement.amountPaid > 0 && payments.length > 0) {
-      let remainingToApply = settlement.amountPaid;
-      
-      const paymentDocs = [];
-      for (const p of payments) {
-        if (remainingToApply <= 0) break;
-        const amt = Math.min(Number(p.amount), remainingToApply);
-        
-        paymentDocs.push({
-          branchId: req.branchId,
-          invoiceId: invoiceDoc._id,
-          direction: 'in',
-          amount: amt,
-          entryType: 'normal',
-          accountHead: 'Sales',
-          partyType: 'customer',
-          partyId: invoiceDoc.customerId || undefined,
-          partyName: customerName || 'Walk-in',
-          paymentStatus: 'paid',
-          paymentMethod: p.method,
-          multiplePayment: payments.length > 1,
-          txnDate: invoiceDoc.closedAt,
-          createdBy: req.user._id
-        });
-        
-        remainingToApply -= amt;
-      }
-      
+      const paymentDocs = buildPaymentDocuments({
+        branchId: req.branchId,
+        invoiceId: invoiceDoc._id,
+        customerId: invoiceDoc.customerId || undefined,
+        customerName: customerName || invoiceDoc.customerName || 'Walk-in',
+        payments,
+        settledAmount: settlement.amountPaid,
+        closedAt: invoiceDoc.closedAt,
+        createdBy: req.user._id
+      });
+
       if (paymentDocs.length > 0) {
         await Payment.insertMany(paymentDocs, { session });
       }

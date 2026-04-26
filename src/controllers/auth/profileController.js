@@ -1,4 +1,4 @@
-const CustomerHistory = require('../../models/customers/CustomerHistory');
+const SalesInvoice = require('../../models/finance/SalesInvoice');
 
 const getProfile = async (req, res) => {
   const user = req.user;
@@ -16,14 +16,14 @@ const getProfile = async (req, res) => {
 
 const getWaiterAnalytics = async (req, res) => {
   const waiterId = req.user._id;
-  const match = { 'waiter.id': waiterId };
+  const match = { waiterId, status: 'active' };
   if (req.branchId) match.branchId = req.branchId;
-  const agg = await CustomerHistory.aggregate([
+  const agg = await SalesInvoice.aggregate([
     { $match: match },
     {
       $group: {
         _id: null,
-        totalSales: { $sum: '$totalAmount' },
+        totalSales: { $sum: '$grandTotal' },
         totalOrders: { $sum: 1 }
       }
     }

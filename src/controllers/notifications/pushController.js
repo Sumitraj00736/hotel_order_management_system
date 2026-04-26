@@ -1,8 +1,9 @@
 const PushSubscription = require('../../models/notifications/PushSubscription');
-const { getPublicKey, isConfigured, sendPushToUser } = require('../../utils/notifications/pushService');
+const pushService = require('../../utils/notifications/pushService');
+const activityService = require('../../utils/notifications/activity');
 
 const getPublicKeyController = async (req, res) => {
-  return res.json({ publicKey: getPublicKey() });
+  return res.json({ publicKey: pushService.getPublicKey() });
 };
 
 const getFirebaseConfig = async (req, res) => {
@@ -13,7 +14,7 @@ const getFirebaseConfig = async (req, res) => {
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || '',
     messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
     appId: process.env.FIREBASE_APP_ID || '',
-    vapidKey: getPublicKey()
+    vapidKey: pushService.getPublicKey()
   });
 };
 
@@ -49,6 +50,24 @@ const subscribe = async (req, res) => {
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
+  await activityService.logActivity({
+    req,
+    branchId: req.branchId,
+    title: 'Push subscription updated',
+    type: 'Push Subscription',
+    action: 'push.subscribe',
+    description: `${req.user?.name || 'User'} subscribed device ${deviceId} for push notifications.`,
+    performedBy: req.user?._id,
+    entityType: 'push-subscription',
+    entityId: doc._id,
+    metadata: {
+      platform,
+      enabled: doc.enabled,
+      deviceId,
+      provider: doc.provider
+    }
+  });
+
   return res.json({ message: 'Subscribed', subscriptionId: doc._id, enabled: doc.enabled });
 };
 
@@ -57,10 +76,26 @@ const unsubscribe = async (req, res) => {
   if (!deviceId && !fcmToken) {
     return res.status(400).json({ message: 'deviceId or fcmToken required' });
   }
-  await PushSubscription.updateMany(
+  const result = await PushSubscription.updateMany(
     { userId: req.user._id, ...(deviceId ? { deviceId } : {}), ...(fcmToken ? { fcmToken } : {}) },
     { enabled: false }
   );
+  await activityService.logActivity({
+    req,
+    branchId: req.branchId,
+    title: 'Push subscription disabled',
+    type: 'Push Subscription',
+    action: 'push.unsubscribe',
+    description: `${req.user?.name || 'User'} unsubscribed a push device.`,
+    performedBy: req.user?._id,
+    entityType: 'push-subscription',
+    entityId: deviceId || fcmToken || 'bulk',
+    metadata: {
+      deviceId,
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount
+    }
+  });
   return res.json({ message: 'Unsubscribed' });
 };
 
@@ -77,6 +112,21 @@ const toggle = async (req, res) => {
   if (!doc) {
     return res.status(404).json({ message: 'Subscription not found' });
   }
+  await activityService.logActivity({
+    req,
+    branchId: req.branchId,
+    title: 'Push subscription toggled',
+    type: 'Push Subscription',
+    action: 'push.toggle',
+    description: `${req.user?.name || 'User'} ${enabled ? 'enabled' : 'disabled'} push subscription ${deviceId}.`,
+    performedBy: req.user?._id,
+    entityType: 'push-subscription',
+    entityId: doc._id,
+    metadata: {
+      deviceId,
+      enabled: doc.enabled
+    }
+  });
   return res.json({ enabled: doc.enabled });
 };
 
@@ -91,7 +141,7 @@ const status = async (req, res) => {
 };
 
 const testPush = async (req, res) => {
-  if (!isConfigured()) {
+  if (!pushService.isConfigured()) {
     return res.status(503).json({ message: 'Push not configured' });
   }
   const { title, body } = req.body || {};
@@ -99,13 +149,35 @@ const testPush = async (req, res) => {
   if (!enabledSubs.length) {
     return res.status(404).json({ message: 'No enabled subscriptions for this device' });
   }
-  await sendPushToUser({
+  const result = await pushService.sendPushToUser({
     userId: req.user._id,
     title: title || 'Test Notification',
     body: body || 'This is a test push from MeroRestro',
     data: { url: '/' }
   });
-  return res.json({ message: 'Push sent', count: enabledSubs.length });
+  await activityService.logActivity({
+    req,
+    branchId: req.branchId,
+    title: 'Test push sent',
+    type: 'Push Notification',
+    action: 'push.test',
+    description: `${req.user?.name || 'User'} triggered a test push notification.`,
+    performedBy: req.user?._id,
+    entityType: 'push-subscription',
+    entityId: req.user?._id,
+    metadata: {
+      subscriptions: enabledSubs.length,
+      attempted: result?.attempted || enabledSubs.length,
+      successCount: result?.successCount || 0,
+      failureCount: result?.failureCount || 0,
+      failureCodes: result?.failureCodes || []
+    }
+  });
+  return res.json({
+    message: 'Push sent',
+    count: enabledSubs.length,
+    delivery: result || { attempted: enabledSubs.length, successCount: 0, failureCount: enabledSubs.length }
+  });
 };
 
 module.exports = {

@@ -113,11 +113,19 @@ const createUser = async (req, res) => {
         active: membershipStatus === 'active'
       });
       await logActivity({
+        req,
         branchId: req.branchId,
         title: 'Staff invited',
         type: 'Staffs Invited',
+        action: 'user.membership.create',
         description: `${req.user?.name || 'Admin'} invited ${existing.name || existing.email} with ${(role ? normalizeRoleKey(role) : 'staff')} role.`,
-        performedBy: req.user?._id
+        performedBy: req.user?._id,
+        entityType: 'user',
+        entityId: existing._id,
+        metadata: {
+          status: membershipStatus,
+          role: resolved?.role || (role ? normalizeRoleKey(role) : 'waiter')
+        }
       });
       return res.status(201).json({ _id: existing._id, id: existing._id, name: existing.name, email: existing.email, role: normalizeRoleKey(role || '') });
     }
@@ -148,11 +156,19 @@ const createUser = async (req, res) => {
       active: membershipStatus === 'active'
     });
     await logActivity({
+      req,
       branchId: req.branchId,
       title: 'Staff invited',
       type: 'Staffs Invited',
+      action: 'user.create',
       description: `${req.user?.name || 'Admin'} invited ${name} with ${(role ? normalizeRoleKey(role) : 'staff')} role.`,
-      performedBy: req.user?._id
+      performedBy: req.user?._id,
+      entityType: 'user',
+      entityId: user._id,
+      metadata: {
+        status: membershipStatus,
+        role: resolved?.role || (role ? normalizeRoleKey(role) : 'waiter')
+      }
     });
     return res.status(201).json({ _id: user._id, id: user._id, name, email, role: user.role });
   } catch (error) {
@@ -174,11 +190,18 @@ const updateUserStatus = async (req, res) => {
     await membership.save();
     const memberUser = await User.findById(req.params.id).select('name email');
     await logActivity({
+      req,
       branchId: req.branchId,
       title: 'Staff status updated',
       type: 'Staff Status',
+      action: 'user.status.update',
       description: `${req.user?.name || 'Admin'} set ${memberUser?.name || memberUser?.email || 'staff'} to ${status}.`,
-      performedBy: req.user?._id
+      performedBy: req.user?._id,
+      entityType: 'user',
+      entityId: req.params.id,
+      metadata: {
+        status
+      }
     });
     return res.json({ message: 'Status updated', status });
   } catch (error) {
@@ -194,6 +217,16 @@ const updateUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     const membership = await UserBranchRole.findOne({ userId: user._id, branchId: req.branchId });
+    const beforeSnapshot = {
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: membership?.role || user.role,
+      dateOfJoining: user.dateOfJoining,
+      salary: user.salary,
+      shiftStart: user.shiftStart,
+      shiftEnd: user.shiftEnd
+    };
     if (membership?.isOwner && (role || roleId)) {
       return res.status(403).json({ message: 'Owner role cannot be changed' });
     }
@@ -236,6 +269,30 @@ const updateUser = async (req, res) => {
     if (password) user.password = await bcrypt.hash(password, 10);
 
     await user.save();
+    await logActivity({
+      req,
+      branchId: req.branchId,
+      title: 'Staff profile updated',
+      type: 'Staff Profile',
+      action: 'user.update',
+      description: `${req.user?.name || 'Admin'} updated ${user.name || user.email}.`,
+      performedBy: req.user?._id,
+      entityType: 'user',
+      entityId: user._id,
+      metadata: {
+        before: beforeSnapshot,
+        after: {
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: membership?.role || user.role,
+          dateOfJoining: user.dateOfJoining,
+          salary: user.salary,
+          shiftStart: user.shiftStart,
+          shiftEnd: user.shiftEnd
+        }
+      }
+    });
     return res.json({ _id: user._id, id: user._id, name: user.name, email: user.email, role: user.role });
   } catch (error) {
     return res.status(500).json({ message: 'Update user failed', error: error.message });
@@ -267,11 +324,19 @@ const updateUserRole = async (req, res) => {
     }
 
     await logActivity({
+      req,
       branchId: req.branchId,
       title: 'Staff role updated',
       type: 'Staff Role',
+      action: 'user.role.update',
       description: `${req.user?.name || 'Admin'} set ${user?.name || 'staff'} to role ${resolved.role}.`,
-      performedBy: req.user?._id
+      performedBy: req.user?._id,
+      entityType: 'user',
+      entityId: req.params.id,
+      metadata: {
+        role: resolved.role,
+        permissions: membership.permissions || []
+      }
     });
 
     return res.json({ message: 'Role updated', role: resolved.role, permissions: resolved.permissions || [] });
@@ -333,6 +398,23 @@ const deleteUser = async (req, res) => {
   if (remaining === 0) {
     await User.findByIdAndDelete(user._id);
   }
+
+  await logActivity({
+    req,
+    branchId: req.branchId,
+    title: 'Staff deleted',
+    type: 'Staff Delete',
+    action: 'user.delete',
+    description: `${req.user?.name || 'Admin'} deleted ${user.name || user.email}.`,
+    performedBy: req.user?._id,
+    entityType: 'user',
+    entityId: user._id,
+    metadata: {
+      branchName: branch?.name,
+      orgName: org?.name,
+      archived: true
+    }
+  });
 
   return res.json({ message: 'User deleted', archived: true });
 };

@@ -1,5 +1,6 @@
 const UserBranchRole = require('../models/users/UserBranchRole');
 const Branch = require('../models/core/Branch');
+const { pickActiveMembership } = require('../utils/branch/access');
 
 // Attaches branchId and branchRole to req based on header x-branch-id and user membership
 const branchScope = async (req, res, next) => {
@@ -8,7 +9,10 @@ const branchScope = async (req, res, next) => {
   const requestedBranchId = req.header('x-branch-id');
 
   // Load memberships
-  const memberships = await UserBranchRole.find({ userId: req.user._id, active: true });
+  let memberships = await UserBranchRole.find({
+    userId: req.user._id,
+    $or: [{ active: true }, { status: 'active' }]
+  });
   req.branchMemberships = memberships;
 
   // If no memberships recorded, allow legacy single-tenant behavior
@@ -26,28 +30,37 @@ const branchScope = async (req, res, next) => {
         orgId: fallbackBranch.orgId,
         role: req.user.role,
         permissions: resolveRolePermissions({ roleName: req.user.role }),
-        active: true
+        active: true,
+        status: 'active'
       },
       { upsert: true, new: true }
     );
-    memberships = await UserBranchRole.find({ userId: req.user._id, active: true });
+    memberships = await UserBranchRole.find({
+      userId: req.user._id,
+      $or: [{ active: true }, { status: 'active' }]
+    });
+    req.branchMemberships = memberships;
   }
 
-  // Choose branch: header > single membership > error
-  let active = null;
-  if (requestedBranchId) {
-    active = memberships.find((m) => m.branchId.toString() === requestedBranchId);
-    if (!active) {
-      return res.status(403).json({ message: 'Branch access denied' });
-    }
-  } else if (memberships.length === 1) {
-    active = memberships[0];
-  } else {
-    return res.status(400).json({
-      message: 'Select a branch',
-      branches: memberships.map((m) => ({ branchId: m.branchId, role: m.role }))
+  const branchAccess = pickActiveMembership({
+    memberships: memberships.map((m) => ({
+      branchId: m.branchId?.toString?.() || m.branchId,
+      role: m.role,
+      permissions: m.permissions || [],
+      active: m.active,
+      status: m.status
+    })),
+    requestedBranchId
+  });
+  if (branchAccess.error) {
+    return res.status(branchAccess.error === 'Select a branch' ? 400 : 403).json({
+      message: branchAccess.error,
+      ...(branchAccess.branches ? { branches: branchAccess.branches } : {})
     });
   }
+  const active = memberships.find(
+    (m) => String(m.branchId) === String(branchAccess.active.branchId)
+  );
 
   req.branchId = active.branchId;
   req.branchRole = active.role;
