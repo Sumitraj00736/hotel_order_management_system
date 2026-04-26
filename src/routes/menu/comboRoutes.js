@@ -9,7 +9,7 @@ const { listCombos, createCombo, updateCombo, deleteCombo } = require('../../con
 const router = express.Router();
 router.use(auth, branchScope);
 
-router.get('/', requirePermission('menu:view'), listCombos);
+router.get('/', requirePermission('menu:combos:view'), listCombos);
 router.post(
   '/',
   requirePermission('menu:edit'),

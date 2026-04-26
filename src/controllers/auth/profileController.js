@@ -14,6 +14,12 @@ const getProfile = async (req, res) => {
     name: user.name,
     email: user.email,
     phone: user.phone || '',
+    profileImageUrl: user.profileImageUrl || '',
+    citizenshipNumber: user.citizenshipNumber || '',
+    citizenshipImageUrl: user.citizenshipImageUrl || '',
+    address: user.address || '',
+    emergencyContactName: user.emergencyContactName || '',
+    emergencyContactPhone: user.emergencyContactPhone || '',
     role: user.role,
     dateOfJoining: user.dateOfJoining,
     salary: user.salary,
@@ -41,6 +47,50 @@ const getProfile = async (req, res) => {
   });
 };
 
+const updateProfile = async (req, res) => {
+  const user = req.user;
+
+  const updates = {
+    name: req.body.name?.trim(),
+    phone: req.body.phone?.trim(),
+    profileImageUrl: req.body.profileImageUrl?.trim(),
+    citizenshipNumber: req.body.citizenshipNumber?.trim(),
+    citizenshipImageUrl: req.body.citizenshipImageUrl?.trim(),
+    address: req.body.address?.trim(),
+    emergencyContactName: req.body.emergencyContactName?.trim(),
+    emergencyContactPhone: req.body.emergencyContactPhone?.trim()
+  };
+
+  if (updates.phone && updates.phone !== user.phone) {
+    const existing = await user.constructor.findOne({
+      phone: updates.phone,
+      _id: { $ne: user._id }
+    });
+    if (existing) {
+      return res.status(409).json({ message: 'Phone already in use by another account' });
+    }
+  }
+
+  if (updates.citizenshipNumber && updates.citizenshipNumber !== user.citizenshipNumber) {
+    const existingCitizenship = await user.constructor.findOne({
+      citizenshipNumber: updates.citizenshipNumber,
+      _id: { $ne: user._id }
+    });
+    if (existingCitizenship) {
+      return res.status(409).json({ message: 'Citizenship number already linked to another account' });
+    }
+  }
+
+  const mutableFields = Object.entries(updates).filter(([, value]) => value !== undefined);
+  mutableFields.forEach(([key, value]) => {
+    user[key] = value;
+  });
+
+  await user.save();
+  req.user = user;
+  return getProfile(req, res);
+};
+
 const getWaiterAnalytics = async (req, res) => {
   const waiterId = req.user._id;
   const match = { waiterId, status: 'active' };
@@ -63,4 +113,4 @@ const getWaiterAnalytics = async (req, res) => {
   });
 };
 
-module.exports = { getProfile, getWaiterAnalytics };
+module.exports = { getProfile, updateProfile, getWaiterAnalytics };

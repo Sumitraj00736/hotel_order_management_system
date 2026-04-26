@@ -9,7 +9,7 @@ const { listCategories, createCategory, updateCategory, deleteCategory } = requi
 const router = express.Router();
 router.use(auth, branchScope);
 
-router.get('/', requirePermission('menu:view'), listCategories);
+router.get('/', requirePermission('menu:categories:view'), listCategories);
 router.post('/', requirePermission('menu:edit'), [body('name').notEmpty()], validate, createCategory);
 router.put('/:id', requirePermission('menu:edit'), [param('id').isMongoId()], validate, updateCategory);
 router.delete('/:id', requirePermission('menu:edit'), [param('id').isMongoId()], validate, deleteCategory);

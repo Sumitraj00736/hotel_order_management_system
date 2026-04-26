@@ -9,7 +9,7 @@ const { listAddOns, createAddOn, updateAddOn, deleteAddOn } = require('../../con
 const router = express.Router();
 router.use(auth, branchScope);
 
-router.get('/', requirePermission('menu:view'), listAddOns);
+router.get('/', requirePermission('menu:addons:view'), listAddOns);
 router.post('/', requirePermission('menu:edit'), [body('name').notEmpty(), body('price').isFloat({ min: 0 })], validate, createAddOn);
 router.put('/:id', requirePermission('menu:edit'), [param('id').isMongoId()], validate, updateAddOn);
 router.delete('/:id', requirePermission('menu:edit'), [param('id').isMongoId()], validate, deleteAddOn);

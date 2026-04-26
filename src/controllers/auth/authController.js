@@ -19,6 +19,20 @@ const createToken = (user) => {
   });
 };
 
+const buildMembershipBranchPayload = (membership) => {
+  const defaults = resolveRolePermissions({ roleName: membership.role });
+  const explicit = Array.isArray(membership.permissions) ? membership.permissions : [];
+  return {
+    branchId: membership.branchId?._id || membership.branchId,
+    branchName: membership.branchId?.name,
+    code: membership.branchId?.code,
+    orgName: membership.orgId?.name,
+    orgSlug: membership.orgId?.slug,
+    role: membership.role,
+    permissions: Array.from(new Set([...(defaults || []), ...explicit]))
+  };
+};
+
 const register = async (req, res) => {
   try {
     const { name, email, phone, password, cafeName, branchName, firebaseUid } = req.body;
@@ -117,15 +131,7 @@ const register = async (req, res) => {
       .populate('branchId', 'name code')
       .populate('orgId', 'name slug');
 
-    const branches = memberships.map((m) => ({
-      branchId: m.branchId?._id || m.branchId,
-      branchName: m.branchId?.name,
-      code: m.branchId?.code,
-      orgName: m.orgId?.name,
-      orgSlug: m.orgId?.slug,
-      role: m.role,
-      permissions: m.permissions
-    }));
+    const branches = memberships.map(buildMembershipBranchPayload);
 
     const token = createToken(user);
     return res.status(201).json({
@@ -185,15 +191,7 @@ const login = async (req, res) => {
         status: blocked?.status || 'inactive'
       });
     }
-    const branches = memberships.map((m) => ({
-      branchId: m.branchId?._id || m.branchId,
-      branchName: m.branchId?.name,
-      code: m.branchId?.code,
-      orgName: m.orgId?.name,
-      orgSlug: m.orgId?.slug,
-      role: m.role,
-      permissions: m.permissions
-    }));
+    const branches = memberships.map(buildMembershipBranchPayload);
 
     // Determine effective role (Elevate to superadmin if an owner)
     const effectiveRole = memberships.some(m => m.isOwner) ? 'superadmin' : (user.role || 'staff');
@@ -256,15 +254,7 @@ const firebaseLogin = async (req, res) => {
       });
     }
 
-    const branches = memberships.map((m) => ({
-      branchId: m.branchId?._id || m.branchId,
-      branchName: m.branchId?.name,
-      code: m.branchId?.code,
-      orgName: m.orgId?.name,
-      orgSlug: m.orgId?.slug,
-      role: m.role,
-      permissions: m.permissions
-    }));
+    const branches = memberships.map(buildMembershipBranchPayload);
 
     // Determine effective role (Elevate to superadmin if an owner)
     const effectiveRole = memberships.some(m => m.isOwner) ? 'superadmin' : (user.role || 'staff');

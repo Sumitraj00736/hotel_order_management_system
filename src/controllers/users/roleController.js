@@ -26,8 +26,8 @@ const ensureDefaultRoles = async (branchId) => {
         role.permissions = ['*'];
         role.isDefault = true;
         await role.save();
-      } else if (!needsStar && current.length === 0 && defaults.length > 0) {
-        role.permissions = defaults;
+      } else if (!needsStar && defaults.length > 0) {
+        role.permissions = Array.from(new Set([...defaults, ...current]));
         role.isDefault = true;
         await role.save();
       }

@@ -12,6 +12,12 @@ const userSchema = new mongoose.Schema(
     salary: { type: Number, min: 0 },
     shiftStart: { type: String, trim: true },
     shiftEnd: { type: String, trim: true },
+    profileImageUrl: { type: String, trim: true },
+    citizenshipNumber: { type: String, trim: true },
+    citizenshipImageUrl: { type: String, trim: true },
+    address: { type: String, trim: true },
+    emergencyContactName: { type: String, trim: true },
+    emergencyContactPhone: { type: String, trim: true },
     promotions: [
       {
         title: { type: String, required: true, trim: true },

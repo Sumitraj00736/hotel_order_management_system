@@ -9,7 +9,7 @@ const { listSubMenus, createSubMenu, updateSubMenu, deleteSubMenu } = require('.
 const router = express.Router();
 router.use(auth, branchScope);
 
-router.get('/', requirePermission('menu:view'), listSubMenus);
+router.get('/', requirePermission('menu:submenus:view'), listSubMenus);
 router.post('/', requirePermission('menu:edit'), [body('name').notEmpty()], validate, createSubMenu);
 router.put('/:id', requirePermission('menu:edit'), [param('id').isMongoId()], validate, updateSubMenu);
 router.delete('/:id', requirePermission('menu:edit'), [param('id').isMongoId()], validate, deleteSubMenu);
