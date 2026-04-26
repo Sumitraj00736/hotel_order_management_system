@@ -60,6 +60,113 @@
               "raw": "{\n  \"email\": \"owner@email.com\",\n  \"password\": \"secret123\"\n}"
             }
           }
+        },
+        {
+          "name": "Firebase Login",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/firebase-login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"FIREBASE_ID_TOKEN\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/forgot-password",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@email.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/reset-password",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"RESET_TOKEN\",\n  \"password\": \"newSecret123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Check Phone",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/check-phone",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"98XXXXXXXX\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "My Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/profile/me",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Waiter Analytics",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/profile/waiter/analytics",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
         }
       ]
     },
@@ -154,24 +261,21 @@
           "name": "Update User Role",
           "request": {
             "method": "PATCH",
+            "url": "{{baseUrl}}/api/users/{{userId}}/role",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
               }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/api/users/:id/role",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "users",
-                ":id",
-                "role"
-              ]
-            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"roleName\": \"waiter\"\n}"
@@ -208,6 +312,196 @@
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/api/users/{{userId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Roles",
+      "item": [
+        {
+          "name": "List Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cashier\",\n  \"description\": \"Front desk\",\n  \"color\": \"#ef4444\",\n  \"permissions\": [\"orders:view\"]\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Role",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/roles/{{roleId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"captain\",\n  \"permissions\": [\n    \"orders:view\",\n    \"orders:edit\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Role",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/roles/{{roleId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Departments",
+      "item": [
+        {
+          "name": "List Departments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/departments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "departments"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Department",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/departments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "departments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kitchen\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Department",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/departments/{{departmentId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kitchen\",\n  \"description\": \"Kitchen operations\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Department",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/departments/{{departmentId}}",
             "header": [
               {
                 "key": "Authorization",
@@ -445,1140 +739,6 @@
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/api/menus/{{menuId}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Tables",
-      "item": [
-        {
-          "name": "List Tables",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/tables",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Get Table",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/tables/{{tableId}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Create Table",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/tables",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"tableNumber\": 1,\n  \"name\": \"Cabin 1\",\n  \"type\": \"cabin\",\n  \"spaceId\": \"{{spaceId}}\",\n  \"capacity\": 4,\n  \"charge\": 0\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Table",
-          "request": {
-            "method": "PUT",
-            "url": "{{baseUrl}}/api/tables/{{tableId}}",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Cabin 1\",\n  \"type\": \"cabin\",\n  \"spaceId\": \"{{spaceId}}\",\n  \"capacity\": 6,\n  \"charge\": 200,\n  \"status\": \"available\"\n}"
-            }
-          }
-        },
-        {
-          "name": "Free Table",
-          "request": {
-            "method": "PATCH",
-            "url": "{{baseUrl}}/api/tables/{{tableId}}/free",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Delete Table",
-          "request": {
-            "method": "DELETE",
-            "url": "{{baseUrl}}/api/tables/{{tableId}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Orders",
-      "item": [
-        {
-          "name": "List Orders",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/orders",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "List Orders (Paginated)",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/orders?paginate=1&page=1&limit=12&dateFrom=2026-01-01&dateTo=2026-12-31",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "orders"
-              ],
-              "query": [
-                {
-                  "key": "paginate",
-                  "value": "1"
-                },
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "12"
-                },
-                {
-                  "key": "dateFrom",
-                  "value": "2026-01-01"
-                },
-                {
-                  "key": "dateTo",
-                  "value": "2026-12-31"
-                }
-              ]
-            },
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Get Order",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/orders/{{orderId}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Create Order",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/orders",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"table\": \"{{tableId}}\",\n  \"items\": [\n    {\n      \"menuItem\": \"{{menuItemId}}\",\n      \"quantity\": 1,\n      \"isComplimentary\": false,\n      \"itemNote\": \"Less spicy\"\n    }\n  ],\n  \"assignedStaff\": \"{{staffId}}\",\n  \"customerName\": \"Walk-in\"\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Order",
-          "request": {
-            "method": "PUT",
-            "url": "{{baseUrl}}/api/orders/{{orderId}}",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"items\": [\n    {\n      \"menuItem\": \"{{menuId}}\",\n      \"quantity\": 3,\n      \"variantId\": \"{{variantId}}\",\n      \"variantName\": \"Chicken\",\n      \"variantPrice\": 220,\n      \"itemNote\": \"Extra spicy\",\n      \"isComplimentary\": false\n    }\n  ]\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Order Status",
-          "request": {
-            "method": "PATCH",
-            "url": "{{baseUrl}}/api/orders/{{orderId}}/status",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"preparing\"\n}"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Bills",
-      "item": [
-        {
-          "name": "Generate Bill",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/bills/{{orderId}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Pay Bill",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/bills/{{orderId}}/pay",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"paymentMethod\": \"cash\",\n  \"paymentStatus\": \"paid\",\n  \"discountType\": \"percent\",\n  \"discountValue\": 10,\n  \"taxRate\": 13,\n  \"tipsAmount\": 0,\n  \"roundOff\": 0,\n  \"tenderAmount\": 500,\n  \"customerName\": \"Ram\"\n}"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Purchases",
-      "item": [
-        {
-          "name": "List Purchases",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/purchases",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Create Purchase",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/purchases",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Monthly Grocery\",\n  \"amount\": 25000,\n  \"paymentMethod\": \"cash\",\n  \"paidAt\": \"2026-04-06\"\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Purchase",
-          "request": {
-            "method": "PUT",
-            "url": "{{baseUrl}}/api/purchases/{{purchaseId}}",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 26000\n}"
-            }
-          }
-        },
-        {
-          "name": "Delete Purchase",
-          "request": {
-            "method": "DELETE",
-            "url": "{{baseUrl}}/api/purchases/{{purchaseId}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Expenses",
-      "item": [
-        {
-          "name": "List Expenses",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/expenses",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Create Expense",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/expenses",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Electricity\",\n  \"amount\": 4500,\n  \"paymentMethod\": \"fonepay\",\n  \"paidAt\": \"2026-04-06\"\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Expense",
-          "request": {
-            "method": "PUT",
-            "url": "{{baseUrl}}/api/expenses/{{expenseId}}",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 5000\n}"
-            }
-          }
-        },
-        {
-          "name": "Delete Expense",
-          "request": {
-            "method": "DELETE",
-            "url": "{{baseUrl}}/api/expenses/{{expenseId}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Reports",
-      "item": [
-        {
-          "name": "Summary Report",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/summary",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Overview Report",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/overview",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Analytics Report",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/analytics",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "History Report",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/history",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Stock Report",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/stock",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Transaction History",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/transactions?limit=20&page=1",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Transaction History CSV",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/transactions?format=csv",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Order Dashboard",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/order-dashboard",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Overview Dashboard",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/overview-dashboard",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Finance Dashboard",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/reports/finance-dashboard",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Dashboard",
-      "item": [
-        {
-          "name": "Dashboard Snapshot",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/dashboard?ordersLimit=100&includeAnalytics=true&includeStock=true&includeHistory=true&includeNotifications=true",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "dashboard"
-              ],
-              "query": [
-                {
-                  "key": "ordersLimit",
-                  "value": "100"
-                },
-                {
-                  "key": "includeAnalytics",
-                  "value": "true"
-                },
-                {
-                  "key": "includeStock",
-                  "value": "true"
-                },
-                {
-                  "key": "includeHistory",
-                  "value": "true"
-                },
-                {
-                  "key": "includeNotifications",
-                  "value": "true"
-                }
-              ]
-            },
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Billing Summary",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/billing/summary",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "billing",
-                "summary"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "List Roles",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/roles",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "roles"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Create Role",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Cashier\",\n  \"description\": \"Cashier role\",\n  \"color\": \"#ef4444\",\n  \"permissions\": [\"View Order\", \"Edit Order\"]\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/roles",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "roles"
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Notifications",
-      "item": [
-        {
-          "name": "List Notifications",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/notifications",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Mark Notification Read",
-          "request": {
-            "method": "PATCH",
-            "url": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Mark All Read",
-          "request": {
-            "method": "PATCH",
-            "url": "{{baseUrl}}/api/notifications/read/all",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Profile",
-      "item": [
-        {
-          "name": "My Profile",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/profile/me",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Waiter Analytics",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/profile/waiter/analytics",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Promotions",
-      "item": [
-        {
-          "name": "My Promotions",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/promotions/me",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "List Promotions (User)",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/promotions/{{userId}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Add Promotion",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/promotions/{{userId}}",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Best Waiter\",\n  \"amount\": 500,\n  \"effectiveDate\": \"2026-04-05\",\n  \"note\": \"Great performance\"\n}"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Inventory",
-      "item": [
-        {
-          "name": "List Ingredients",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/inventory/ingredients",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Create Ingredient",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/inventory/ingredients",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Tomato\",\n  \"unit\": \"kg\",\n  \"currentStock\": 10,\n  \"reorderLevel\": 5\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Ingredient",
-          "request": {
-            "method": "PUT",
-            "url": "{{baseUrl}}/api/inventory/ingredients/{{ingredientId}}",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"currentStock\": 12,\n  \"reorderLevel\": 5\n}"
-            }
-          }
-        },
-        {
-          "name": "Restock Ingredient",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/inventory/ingredients/{{ingredientId}}/restock",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 5\n}"
-            }
-          }
-        },
-        {
-          "name": "List Transactions",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/inventory/transactions",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "Set Recipe",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/inventory/recipes",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"menuItem\": \"{{menuId}}\",\n  \"ingredients\": [{\n    \"ingredient\": \"{{ingredientId}}\",\n    \"quantity\": 0.2\n  }]\n}"
-            }
-          }
-        },
-        {
-          "name": "Get Recipe",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/inventory/recipes/{{menuId}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              },
-              {
-                "key": "x-branch-id",
-                "value": "{{branchId}}"
-              }
-            ]
-          }
-        },
-        {
-          "name": "List Recipes",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/inventory/recipes",
             "header": [
               {
                 "key": "Authorization",
@@ -1950,6 +1110,539 @@
       ]
     },
     {
+      "name": "Tables",
+      "item": [
+        {
+          "name": "List Tables",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/tables",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Get Table",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/tables/{{tableId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Table",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/tables",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tableNumber\": 1,\n  \"name\": \"Cabin 1\",\n  \"type\": \"cabin\",\n  \"spaceId\": \"{{spaceId}}\",\n  \"capacity\": 4,\n  \"charge\": 0\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Table",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/tables/{{tableId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cabin 1\",\n  \"type\": \"cabin\",\n  \"spaceId\": \"{{spaceId}}\",\n  \"capacity\": 6,\n  \"charge\": 200,\n  \"status\": \"available\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Free Table",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/tables/{{tableId}}/free",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Delete Table",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/tables/{{tableId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Table Types",
+      "item": [
+        {
+          "name": "List Table Types",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/table-types",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Table Type",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/table-types",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"VIP\",\n  \"active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Table Type",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/table-types/{{tableTypeId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Family Booth\",\n  \"active\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Table Type",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/table-types/{{tableTypeId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spaces",
+      "item": [
+        {
+          "name": "List Spaces",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaces",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "spaces"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Space",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/spaces",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "spaces"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"VIP\",\n  \"type\": \"cabin\",\n  \"capacity\": 6,\n  \"charge\": 200\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Space",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/spaces/{{spaceId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rooftop\",\n  \"capacity\": 24,\n  \"charge\": 0\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Space",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/spaces/{{spaceId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "QR Codes",
+      "item": [
+        {
+          "name": "List QR Codes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/qr-codes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "qr-codes"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "List Orders",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/orders",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "List Orders (Paginated)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?paginate=1&page=1&limit=12&dateFrom=2026-01-01&dateTo=2026-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "paginate",
+                  "value": "1"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "12"
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "dateTo",
+                  "value": "2026-12-31"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Get Order",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/orders/{{orderId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/orders",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"table\": \"{{tableId}}\",\n  \"items\": [\n    {\n      \"menuItem\": \"{{menuItemId}}\",\n      \"quantity\": 1,\n      \"isComplimentary\": false,\n      \"itemNote\": \"Less spicy\"\n    }\n  ],\n  \"assignedStaff\": \"{{staffId}}\",\n  \"customerName\": \"Walk-in\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Order",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/orders/{{orderId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"menuItem\": \"{{menuId}}\",\n      \"quantity\": 3,\n      \"variantId\": \"{{variantId}}\",\n      \"variantName\": \"Chicken\",\n      \"variantPrice\": 220,\n      \"itemNote\": \"Extra spicy\",\n      \"isComplimentary\": false\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Order Status",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/orders/{{orderId}}/status",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"preparing\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bills",
+      "item": [
+        {
+          "name": "Generate Bill",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/bills/{{orderId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Pay Bill",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/bills/{{orderId}}/pay",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethod\": \"cash\",\n  \"paymentStatus\": \"paid\",\n  \"discountType\": \"percent\",\n  \"discountValue\": 10,\n  \"taxRate\": 13,\n  \"tipsAmount\": 0,\n  \"roundOff\": 0,\n  \"tenderAmount\": 500,\n  \"customerName\": \"Ram\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Guest",
       "item": [
         {
@@ -1986,6 +1679,1711 @@
       ]
     },
     {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "List Ingredients",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/inventory/ingredients",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Ingredient",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/inventory/ingredients",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tomato\",\n  \"unit\": \"kg\",\n  \"currentStock\": 10,\n  \"reorderLevel\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Ingredient",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/inventory/ingredients/{{ingredientId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentStock\": 12,\n  \"reorderLevel\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "Restock Ingredient",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/inventory/ingredients/{{ingredientId}}/restock",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "List Transactions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/inventory/transactions",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Set Recipe",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/inventory/recipes",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"menuItem\": \"{{menuId}}\",\n  \"ingredients\": [{\n    \"ingredient\": \"{{ingredientId}}\",\n    \"quantity\": 0.2\n  }]\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Recipe",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/inventory/recipes/{{menuId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "List Recipes",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/inventory/recipes",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "List Ingredient Units",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/inventory/ingredient-units",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Ingredient Unit",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/inventory/ingredient-units",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"kg\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Ingredient Unit",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/inventory/ingredient-units/{{ingredientUnitId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"gram\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Ingredient Unit",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/inventory/ingredient-units/{{ingredientUnitId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Delete Ingredient",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/inventory/ingredients/{{ingredientId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Delete Recipe",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/inventory/recipes/{{recipeId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Suppliers",
+      "item": [
+        {
+          "name": "List Suppliers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/suppliers",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Supplier",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/suppliers",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fresh Mart\",\n  \"phone\": \"9800000000\",\n  \"email\": \"freshmart@example.com\",\n  \"address\": \"Kathmandu\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Supplier",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/suppliers/{{supplierId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fresh Mart Pvt Ltd\",\n  \"phone\": \"9800000001\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Supplier",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/suppliers/{{supplierId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Supplier Ledger",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/suppliers/{{supplierId}}/ledger",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Purchases",
+      "item": [
+        {
+          "name": "List Purchases",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchases",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Purchase",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/purchases",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Monthly Grocery\",\n  \"amount\": 25000,\n  \"paymentMethod\": \"cash\",\n  \"paidAt\": \"2026-04-06\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Purchase",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/purchases/{{purchaseId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billDate\": \"2026-04-26\",\n  \"paymentStatus\": \"paid\",\n  \"paymentMethod\": \"bank\",\n  \"items\": [\n    {\n      \"name\": \"Oil Tin\",\n      \"quantity\": 2,\n      \"price\": 2200\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Purchase",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/purchases/{{purchaseId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Purchase Returns",
+      "item": [
+        {
+          "name": "List Purchase Returns",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/purchase-returns",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Purchase Return",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/purchase-returns",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplier\": \"{{supplierId}}\",\n  \"billDate\": \"2026-04-26\",\n  \"paymentMethod\": \"cash\",\n  \"paymentStatus\": \"paid\",\n  \"items\": [\n    {\n      \"name\": \"Rice Bag\",\n      \"quantity\": 1,\n      \"price\": 1200\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Purchase Return",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/purchase-returns/{{purchaseReturnId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentStatus\": \"unpaid_credit\",\n  \"note\": \"Credit note pending\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Purchase Return",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/purchase-returns/{{purchaseReturnId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sales Returns",
+      "item": [
+        {
+          "name": "List Sales Returns",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/sales-returns",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Sales Return",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/sales-returns",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": \"{{customerId}}\",\n  \"txnDate\": \"2026-04-26\",\n  \"paymentMethod\": \"cash\",\n  \"paymentStatus\": \"paid\",\n  \"items\": [\n    {\n      \"menuItem\": \"{{menuId}}\",\n      \"quantity\": 1,\n      \"price\": 350\n    }\n  ],\n  \"reason\": \"Order issue\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Sales Return",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/sales-returns/{{salesReturnId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentStatus\": \"unpaid_credit\",\n  \"remarks\": \"Refund pending\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Sales Return",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/sales-returns/{{salesReturnId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sales Invoices",
+      "item": [
+        {
+          "name": "List Sales Invoices",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/finance/sales-invoices?page=1&limit=20",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Expenses",
+      "item": [
+        {
+          "name": "List Expenses",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/expenses",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Expense",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/expenses",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Electricity\",\n  \"amount\": 4500,\n  \"paymentMethod\": \"fonepay\",\n  \"paidAt\": \"2026-04-06\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Expense",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/expenses/{{expenseId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Electricity Bill\",\n  \"amount\": 5400,\n  \"paymentMethod\": \"bank\",\n  \"paidAt\": \"2026-04-26\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Expense",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/expenses/{{expenseId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Incomes",
+      "item": [
+        {
+          "name": "List Incomes",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/incomes",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Income",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/incomes",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 2500,\n  \"title\": \"Vendor rebate\",\n  \"accountHead\": \"Other Income\",\n  \"partyType\": \"other\",\n  \"paymentMethod\": \"bank\",\n  \"paymentStatus\": \"paid\",\n  \"txnDate\": \"2026-04-26\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Income",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/incomes/{{incomeId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 3000,\n  \"note\": \"Adjusted rebate amount\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Income",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/incomes/{{incomeId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "List Payments",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/payments?direction=in&page=1&limit=20",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Create Payment",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/payments",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"direction\": \"in\",\n  \"amount\": 1200,\n  \"txnDate\": \"2026-04-26\",\n  \"paymentMethod\": \"cash\",\n  \"paymentStatus\": \"paid\",\n  \"partyType\": \"customer\",\n  \"partyName\": \"Walk-in Customer\",\n  \"remarks\": \"Advance payment\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Payment",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/payments/{{paymentId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1500,\n  \"remarks\": \"Updated payment amount\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Payment",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/payments/{{paymentId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Taxes",
+      "item": [
+        {
+          "name": "List Taxes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/taxes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "taxes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Tax",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/taxes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "taxes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"VAT\",\n  \"rate\": 13\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Tax",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/taxes/{{taxId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"VAT\",\n  \"rate\": 13,\n  \"isInclusive\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Tax",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/taxes/{{taxId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Daybook",
+      "item": [
+        {
+          "name": "Daybook Summary",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/daybook/summary",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Daybook History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/daybook/history",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Close Daybook",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/daybook/close",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"remarks\": \"Closing after end-of-day reconciliation\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "Billing Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/billing/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "summary"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Summary Report",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/summary",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Overview Report",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/overview",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Analytics Report",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/analytics",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "History Report",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/history",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Stock Report",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/stock",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Transaction History",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/transactions?limit=20&page=1",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Transaction History CSV",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/transactions?format=csv",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Order Dashboard",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/order-dashboard",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Overview Dashboard",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/overview-dashboard",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Finance Dashboard",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/reports/finance-dashboard",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Dashboard Snapshot",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard?ordersLimit=100&includeAnalytics=true&includeStock=true&includeHistory=true&includeNotifications=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dashboard"
+              ],
+              "query": [
+                {
+                  "key": "ordersLimit",
+                  "value": "100"
+                },
+                {
+                  "key": "includeAnalytics",
+                  "value": "true"
+                },
+                {
+                  "key": "includeStock",
+                  "value": "true"
+                },
+                {
+                  "key": "includeHistory",
+                  "value": "true"
+                },
+                {
+                  "key": "includeNotifications",
+                  "value": "true"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Billing Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/billing/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "billing",
+                "summary"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Roles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cashier\",\n  \"description\": \"Cashier role\",\n  \"color\": \"#ef4444\",\n  \"permissions\": [\"View Order\", \"Edit Order\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "roles"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/notifications",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/notifications/read/all",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Push",
+      "item": [
+        {
+          "name": "Get Public Key",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/push/public-key",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Get Firebase Config",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/push/config"
+          }
+        },
+        {
+          "name": "Push Status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/push/status?deviceId={{pushDeviceId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Subscribe Push",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/push/subscribe",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fcmToken\": \"FCM_DEVICE_TOKEN\",\n  \"deviceId\": \"{{pushDeviceId}}\",\n  \"enabled\": true,\n  \"platform\": \"web\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Unsubscribe Push",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/push/unsubscribe",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"{{pushDeviceId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Toggle Push",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/api/push/toggle",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"{{pushDeviceId}}\",\n  \"enabled\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Test Push",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/push/test",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Notification\",\n  \"body\": \"Testing push delivery from Postman\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activity Logs",
+      "item": [
+        {
+          "name": "List Activity Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/activity-logs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "activity-logs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Promotions",
+      "item": [
+        {
+          "name": "My Promotions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/promotions/me",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "List Promotions (User)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/promotions/{{userId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Add Promotion",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/promotions/{{userId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Best Waiter\",\n  \"amount\": 500,\n  \"effectiveDate\": \"2026-04-05\",\n  \"note\": \"Great performance\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Public",
       "item": [
         {
@@ -1993,6 +3391,48 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/public/cafes/{{cafeSlug}}"
+          }
+        },
+        {
+          "name": "Get Website Settings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/public/website-settings",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Update Website Settings",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/api/public/website-settings",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "x-branch-id",
+                "value": "{{branchId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cafeName\": \"Mero Restro\",\n  \"heroTitle\": \"Fresh food, fast service\",\n  \"themeColor\": \"#0f766e\"\n}"
+            }
           }
         }
       ]
@@ -2303,109 +3743,6 @@
       ]
     },
     {
-      "name": "Departments",
-      "item": [
-        {
-          "name": "List Departments",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/departments",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "departments"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Create Department",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/departments",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "departments"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Kitchen\"\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Department",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/departments/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "departments",
-                ":id"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"active\": true\n}"
-            }
-          }
-        },
-        {
-          "name": "Delete Department",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/departments/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "departments",
-                ":id"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "Support",
       "item": [
         {
@@ -2453,382 +3790,6 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"subject\": \"Need help\",\n  \"message\": \"Printer not connecting\"\n}"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Taxes",
-      "item": [
-        {
-          "name": "List Taxes",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/taxes",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "taxes"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Create Tax",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/taxes",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "taxes"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"VAT\",\n  \"rate\": 13\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Tax",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/taxes/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "taxes",
-                ":id"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"VAT\",\n  \"rate\": 10\n}"
-            }
-          }
-        },
-        {
-          "name": "Delete Tax",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/taxes/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "taxes",
-                ":id"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Activity Logs",
-      "item": [
-        {
-          "name": "List Activity Logs",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/activity-logs",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "activity-logs"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Roles",
-      "item": [
-        {
-          "name": "List Roles",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/roles",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "roles"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Create Role",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/roles",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "roles"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Cashier\",\n  \"description\": \"Front desk\",\n  \"color\": \"#ef4444\",\n  \"permissions\": [\"orders:view\"]\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Role",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/roles/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "roles",
-                ":id"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"description\": \"Updated\"\n}"
-            }
-          }
-        },
-        {
-          "name": "Delete Role",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/roles/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "roles",
-                ":id"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Billing",
-      "item": [
-        {
-          "name": "Billing Summary",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/billing/summary",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "billing",
-                "summary"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Spaces",
-      "item": [
-        {
-          "name": "List Spaces",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/spaces",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "spaces"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Create Space",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/spaces",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "spaces"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"VIP\",\n  \"type\": \"cabin\",\n  \"capacity\": 6,\n  \"charge\": 200\n}"
-            }
-          }
-        },
-        {
-          "name": "Update Space",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/spaces/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "spaces",
-                ":id"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"VIP Updated\",\n  \"capacity\": 8,\n  \"charge\": 250\n}"
-            }
-          }
-        },
-        {
-          "name": "Delete Space",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/spaces/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "spaces",
-                ":id"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "QR Codes",
-      "item": [
-        {
-          "name": "List QR Codes",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/qr-codes",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "qr-codes"
-              ]
             }
           }
         }
@@ -2898,6 +3859,66 @@
     },
     {
       "key": "cafeSlug",
+      "value": ""
+    },
+    {
+      "key": "customerId",
+      "value": ""
+    },
+    {
+      "key": "supplierId",
+      "value": ""
+    },
+    {
+      "key": "roleId",
+      "value": ""
+    },
+    {
+      "key": "departmentId",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    },
+    {
+      "key": "incomeId",
+      "value": ""
+    },
+    {
+      "key": "salesReturnId",
+      "value": ""
+    },
+    {
+      "key": "purchaseReturnId",
+      "value": ""
+    },
+    {
+      "key": "salesInvoiceId",
+      "value": ""
+    },
+    {
+      "key": "tableTypeId",
+      "value": ""
+    },
+    {
+      "key": "spaceId",
+      "value": ""
+    },
+    {
+      "key": "taxId",
+      "value": ""
+    },
+    {
+      "key": "pushDeviceId",
+      "value": "web-browser-1"
+    },
+    {
+      "key": "ingredientUnitId",
+      "value": ""
+    },
+    {
+      "key": "recipeId",
       "value": ""
     }
   ]
