@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const MathUtils = require('../../utils/mathUtils');
 
 const attachmentSchema = new mongoose.Schema(
   {
@@ -43,6 +44,17 @@ const purchaseSchema = new mongoose.Schema(
 
     // Computed total amount for the purchase bill.
     amount: { type: Number, required: true, min: 0 },
+    subTotal: { type: Number, default: 0, min: 0 },
+    discountType: { type: String, enum: ['amount', 'percent'], default: 'amount' },
+    discountValue: { type: Number, default: 0, min: 0 },
+    discountAmount: { type: Number, default: 0, min: 0 },
+    taxRate: { type: Number, default: 0, min: 0 },
+    taxAmount: { type: Number, default: 0, min: 0 },
+    taxableAmount: { type: Number, default: 0, min: 0 },
+    roundOff: { type: Number, default: 0 },
+    grandTotal: { type: Number, default: 0, min: 0 },
+    amountPaid: { type: Number, default: 0, min: 0 },
+    amountDue: { type: Number, default: 0, min: 0 },
 
     paymentStatus: { type: String, enum: ['paid', 'unpaid_credit'], default: 'paid' },
     paymentMethod: { type: String, enum: ['cash', 'fonepay', 'card', 'bank', 'owner'], default: 'cash' },
@@ -52,6 +64,10 @@ const purchaseSchema = new mongoose.Schema(
     note: { type: String, trim: true },
     items: { type: [purchaseItemSchema], default: [] },
     attachments: { type: [attachmentSchema], default: [] },
+    status: { type: String, enum: ['active', 'void'], default: 'active' },
+    voidReason: { type: String, trim: true },
+    voidedAt: { type: Date },
+    voidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
   },
   { timestamps: true }
@@ -59,5 +75,27 @@ const purchaseSchema = new mongoose.Schema(
 
 purchaseSchema.index({ branchId: 1, paidAt: -1 });
 purchaseSchema.index({ branchId: 1, createdAt: -1 });
+purchaseSchema.index({ branchId: 1, status: 1, paidAt: -1 });
+
+purchaseSchema.pre('save', function (next) {
+  [
+    'amount',
+    'subTotal',
+    'discountValue',
+    'discountAmount',
+    'taxRate',
+    'taxAmount',
+    'taxableAmount',
+    'roundOff',
+    'grandTotal',
+    'amountPaid',
+    'amountDue'
+  ].forEach((field) => {
+    if (this[field] !== undefined) {
+      this[field] = MathUtils.roundAmount(this[field]);
+    }
+  });
+  next();
+});
 
 module.exports = mongoose.model('Purchase', purchaseSchema);

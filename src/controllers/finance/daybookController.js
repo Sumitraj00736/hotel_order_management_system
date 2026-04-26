@@ -1,4 +1,3 @@
-const CustomerHistory = require('../../models/customers/CustomerHistory');
 const Purchase = require('../../models/finance/Purchase');
 const Expense = require('../../models/finance/Expense');
 const Income = require('../../models/finance/Income');
@@ -115,25 +114,25 @@ const computeDaybook = async ({ branchId, day }) => {
     purchaseReturnRows,
     previousClose
   ] = await Promise.all([
-    SalesInvoice.find({ ...matchBranch, closedAt: { $gte: from, $lte: to } })
+    SalesInvoice.find({ ...matchBranch, status: 'active', closedAt: { $gte: from, $lte: to } })
       .select('grandTotal amountPaid amountDue paymentStatus closedAt')
       .lean(),
-    Purchase.find({ ...matchBranch, paidAt: { $gte: from, $lte: to } })
+    Purchase.find({ ...matchBranch, status: 'active', paidAt: { $gte: from, $lte: to } })
       .select('paymentMethod amount paymentStatus')
       .lean(),
-    Expense.find({ ...matchBranch, paidAt: { $gte: from, $lte: to } })
+    Expense.find({ ...matchBranch, status: 'active', paidAt: { $gte: from, $lte: to } })
       .select('paymentMethod amount paymentStatus')
       .lean(),
-    Income.find({ ...matchBranch, txnDate: { $gte: from, $lte: to } })
+    Income.find({ ...matchBranch, status: 'active', txnDate: { $gte: from, $lte: to } })
       .select('paymentMethod amount paymentStatus')
       .lean(),
-    Payment.find({ ...matchBranch, txnDate: { $gte: from, $lte: to } })
+    Payment.find({ ...matchBranch, status: 'active', txnDate: { $gte: from, $lte: to } })
       .select('direction paymentMethod amount paymentStatus entryType invoiceId')
       .lean(),
-    SalesReturn.find({ ...matchBranch, txnDate: { $gte: from, $lte: to } })
+    SalesReturn.find({ ...matchBranch, status: 'active', txnDate: { $gte: from, $lte: to } })
       .select('paymentMethod netAmount totalAmount paymentStatus')
       .lean(),
-    PurchaseReturn.find({ ...matchBranch, billDate: { $gte: from, $lte: to } })
+    PurchaseReturn.find({ ...matchBranch, status: 'active', billDate: { $gte: from, $lte: to } })
       .select('paymentMethod totalAmount paymentStatus')
       .lean(),
     DaybookClose.findOne({ ...matchBranch, day: { $lt: from } })

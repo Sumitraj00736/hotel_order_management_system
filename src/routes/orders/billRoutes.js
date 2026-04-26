@@ -14,7 +14,7 @@ router.get('/:id', requirePermission('orders:checkout:view', 'orders:view'), gen
 router.post(
   '/:id/pay',
   requirePermission('orders:checkout:edit', 'orders:edit'),
-  [body('paymentMethod').isIn(['cash', 'fonepay', 'card', 'bank'])],
+  [body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank'])],
   validate,
   payBill
 );

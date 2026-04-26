@@ -1,8 +1,47 @@
 const PurchaseReturn = require('../../models/finance/PurchaseReturn');
+const { computeSimpleTotals } = require('../../utils/finance/calculations');
+
+const buildPurchaseReturnPayload = (body, req) => {
+  const totals = computeSimpleTotals({
+    items: Array.isArray(body.items) ? body.items : [],
+    discountType: 'amount',
+    discountValue: body.discount || 0,
+    taxRate: body.taxRate || 0,
+    roundOff: body.roundOff || 0,
+    quantityKeys: ['qty', 'quantity'],
+    rateKeys: ['rate', 'unitPrice'],
+    amountKeys: ['amount', 'total']
+  });
+
+  return {
+    branchId: req.branchId,
+    supplierId: body.supplierId,
+    supplierName: body.supplierName,
+    billDate: body.billDate ? new Date(body.billDate) : new Date(),
+    billReferenceNumber: body.billReferenceNumber,
+    purchaseStaff: body.purchaseStaff,
+    subTotal: totals.subTotal,
+    discount: totals.discountAmount,
+    taxableAmount: totals.taxableAmount,
+    totalAmount: totals.grandTotal,
+    paymentStatus: body.paymentStatus || 'paid',
+    paymentMethod: body.paymentMethod || 'cash',
+    multiplePayment: Boolean(body.multiplePayment),
+    attachments: Array.isArray(body.attachments) ? body.attachments : [],
+    remarks: body.remarks,
+    items: totals.items.map((item) => ({
+      ...item,
+      qty: item.qty,
+      amount: item.amount
+    })),
+    createdBy: body.createdBy || req.user?._id
+  };
+};
 
 const listPurchaseReturns = async (req, res) => {
   try {
-    const filter = req.branchId ? { branchId: req.branchId } : {};
+    const filter = { status: 'active' };
+    if (req.branchId) filter.branchId = req.branchId;
     const { dateFrom, dateTo } = req.query;
     if (dateFrom || dateTo) {
       filter.billDate = {};
@@ -18,32 +57,7 @@ const listPurchaseReturns = async (req, res) => {
 
 const createPurchaseReturn = async (req, res) => {
   try {
-    const items = Array.isArray(req.body.items) ? req.body.items : [];
-    const subTotal =
-      req.body.subTotal !== undefined
-        ? Number(req.body.subTotal || 0)
-        : items.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-    const totalAmount = req.body.totalAmount !== undefined ? Number(req.body.totalAmount || 0) : subTotal;
-    const payload = {
-      branchId: req.branchId,
-      supplierId: req.body.supplierId,
-      supplierName: req.body.supplierName,
-      billDate: req.body.billDate ? new Date(req.body.billDate) : new Date(),
-      billReferenceNumber: req.body.billReferenceNumber,
-      purchaseStaff: req.body.purchaseStaff,
-      subTotal,
-      discount: Number(req.body.discount || 0),
-      taxableAmount: req.body.taxableAmount !== undefined ? Number(req.body.taxableAmount || 0) : totalAmount,
-      totalAmount,
-      paymentStatus: req.body.paymentStatus || 'paid',
-      paymentMethod: req.body.paymentMethod || 'cash',
-      multiplePayment: Boolean(req.body.multiplePayment),
-      attachments: Array.isArray(req.body.attachments) ? req.body.attachments : [],
-      remarks: req.body.remarks,
-      items,
-      createdBy: req.user?._id
-    };
-    const doc = await PurchaseReturn.create(payload);
+    const doc = await PurchaseReturn.create(buildPurchaseReturnPayload(req.body, req));
     return res.status(201).json(doc);
   } catch (error) {
     return res.status(500).json({ message: 'Create purchase return failed', error: error.message });
@@ -52,34 +66,18 @@ const createPurchaseReturn = async (req, res) => {
 
 const updatePurchaseReturn = async (req, res) => {
   try {
-    const items = Array.isArray(req.body.items) ? req.body.items : undefined;
-    const computedSubTotal = Array.isArray(items) ? items.reduce((sum, row) => sum + Number(row.amount || 0), 0) : undefined;
-    const subTotal = req.body.subTotal !== undefined ? Number(req.body.subTotal || 0) : computedSubTotal;
-    const totalAmount = req.body.totalAmount !== undefined ? Number(req.body.totalAmount || 0) : subTotal;
+    const existing = await PurchaseReturn.findOne({
+      _id: req.params.id,
+      status: 'active',
+      ...(req.branchId ? { branchId: req.branchId } : {})
+    });
+    if (!existing) return res.status(404).json({ message: 'Purchase return not found' });
 
-    const update = {
-      supplierId: req.body.supplierId,
-      supplierName: req.body.supplierName,
-      billDate: req.body.billDate ? new Date(req.body.billDate) : undefined,
-      billReferenceNumber: req.body.billReferenceNumber,
-      purchaseStaff: req.body.purchaseStaff,
-      subTotal,
-      discount: req.body.discount !== undefined ? Number(req.body.discount || 0) : undefined,
-      taxableAmount: req.body.taxableAmount !== undefined ? Number(req.body.taxableAmount || 0) : undefined,
-      totalAmount,
-      paymentStatus: req.body.paymentStatus,
-      paymentMethod: req.body.paymentMethod,
-      multiplePayment: req.body.multiplePayment !== undefined ? Boolean(req.body.multiplePayment) : undefined,
-      attachments: Array.isArray(req.body.attachments) ? req.body.attachments : undefined,
-      remarks: req.body.remarks,
-      items
-    };
     const doc = await PurchaseReturn.findOneAndUpdate(
-      { _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) },
-      { $set: update },
+      { _id: req.params.id, status: 'active', ...(req.branchId ? { branchId: req.branchId } : {}) },
+      { $set: buildPurchaseReturnPayload({ ...existing.toObject(), ...req.body }, req) },
       { new: true }
     );
-    if (!doc) return res.status(404).json({ message: 'Purchase return not found' });
     return res.json(doc);
   } catch (error) {
     return res.status(500).json({ message: 'Update purchase return failed', error: error.message });
@@ -88,13 +86,23 @@ const updatePurchaseReturn = async (req, res) => {
 
 const deletePurchaseReturn = async (req, res) => {
   try {
-    const doc = await PurchaseReturn.findOneAndDelete({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
+    const doc = await PurchaseReturn.findOneAndUpdate(
+      { _id: req.params.id, status: 'active', ...(req.branchId ? { branchId: req.branchId } : {}) },
+      {
+        $set: {
+          status: 'void',
+          voidReason: req.body.reason || 'Voided via UI',
+          voidedAt: new Date(),
+          voidedBy: req.user?._id
+        }
+      },
+      { new: true }
+    );
     if (!doc) return res.status(404).json({ message: 'Purchase return not found' });
-    return res.json({ message: 'Purchase return deleted' });
+    return res.json({ message: 'Purchase return successfully voided' });
   } catch (error) {
     return res.status(500).json({ message: 'Delete purchase return failed', error: error.message });
   }
 };
 
 module.exports = { listPurchaseReturns, createPurchaseReturn, updatePurchaseReturn, deletePurchaseReturn };
-

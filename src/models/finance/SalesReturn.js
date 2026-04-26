@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const MathUtils = require('../../utils/mathUtils');
 
 const attachmentSchema = new mongoose.Schema(
   {
@@ -45,6 +46,10 @@ const salesReturnSchema = new mongoose.Schema(
 
     attachments: { type: [attachmentSchema], default: [] },
     remarks: { type: String, trim: true, default: '' },
+    status: { type: String, enum: ['active', 'void'], default: 'active' },
+    voidReason: { type: String, trim: true },
+    voidedAt: { type: Date },
+    voidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
     items: { type: [salesReturnItemSchema], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
@@ -54,6 +59,15 @@ const salesReturnSchema = new mongoose.Schema(
 
 salesReturnSchema.index({ branchId: 1, txnDate: -1 });
 salesReturnSchema.index({ branchId: 1, createdAt: -1 });
+salesReturnSchema.index({ branchId: 1, status: 1, txnDate: -1 });
+
+salesReturnSchema.pre('save', function (next) {
+  ['subTotal', 'roundOffDiscount', 'taxableAmount', 'totalAmount', 'netAmount'].forEach((field) => {
+    if (this[field] !== undefined) {
+      this[field] = MathUtils.roundAmount(this[field]);
+    }
+  });
+  next();
+});
 
 module.exports = mongoose.model('SalesReturn', salesReturnSchema);
-

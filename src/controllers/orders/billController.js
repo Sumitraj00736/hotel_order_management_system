@@ -1,12 +1,17 @@
 const Order = require('../../models/orders/Order');
 const Table = require('../../models/tables/Table');
-const CustomerHistory = require('../../models/customers/CustomerHistory');
 const SalesInvoice = require('../../models/finance/SalesInvoice');
 const Payment = require('../../models/finance/Payment');
 const { emitOrderUpdate, emitTableUpdate } = require('../../utils/realtime/socket');
 const { notifyRole, notifyUser } = require('../../utils/notifications/notify');
 const { logActivity } = require('../../utils/notifications/activity');
 const { nextSequence } = require('../../utils/common/counter');
+const {
+  computeOrderInvoiceTotals,
+  normalizePaymentBreakdown,
+  deriveSettlement,
+  sanitizeAmount
+} = require('../../utils/finance/calculations');
 
 const generateBill = async (req, res) => {
   const order = await Order.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })
@@ -107,41 +112,35 @@ const payBill = async (req, res) => {
     }
 
     // Adapt legacy single payment -> new payments array
-    if (!payments) {
-      if (paymentStatus === 'paid' && paymentMethod) {
-        // We calculate finalAmount below, so we'll just set it temporarily and update it
-        payments = [{ method: paymentMethod, amount: tenderAmount || 0 }];
-      } else {
-        payments = [];
-      }
-    }
+    const invoiceTotals = computeOrderInvoiceTotals({
+      subTotal: order.subTotal ?? order.totalAmount,
+      discountType,
+      discountValue,
+      taxRate,
+      tipsAmount,
+      roundOff
+    });
 
-    const subTotal = order.subTotal ?? order.totalAmount;
-    const discountAmt =
-      discountType === 'percent'
-        ? (subTotal * Number(discountValue || 0)) / 100
-        : Number(discountValue || 0);
-    const taxableAmount = Math.max(0, subTotal - discountAmt);
-    const taxAmount = (taxableAmount * Number(taxRate || 0)) / 100;
-    const finalAmount = Math.max(0, taxableAmount + taxAmount + Number(tipsAmount || 0) + Number(roundOff || 0));
-    
+    payments = normalizePaymentBreakdown(
+      payments ||
+        (paymentMethod
+          ? [{ method: paymentMethod, amount: tenderAmount || invoiceTotals.grandTotal }]
+          : []),
+      paymentMethod || 'cash'
+    );
+
     if (payments.length === 1 && payments[0].amount === 0) {
-       payments[0].amount = finalAmount;
+      payments[0].amount = invoiceTotals.grandTotal;
     }
-    
-    // Sum the payments
-    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const amountPaid = Math.min(finalAmount, totalPaid); // Realized revenue (don't count returned change)
-    const changeDue = Math.max(0, totalPaid - finalAmount);
 
-    let finalPaymentStatus = 'unpaid';
-    if (amountPaid >= finalAmount) {
-      finalPaymentStatus = 'paid';
-    } else if (amountPaid > 0) {
-      finalPaymentStatus = 'partial';
-    } else if (paymentStatus === 'unpaid_credit') {
-      finalPaymentStatus = 'unpaid'; // Credit logic handled by amountDue > 0
-    }
+    const totalPaid = sanitizeAmount(payments.reduce((sum, p) => sum + Number(p.amount || 0), 0));
+    const settlement = deriveSettlement({
+      grandTotal: invoiceTotals.grandTotal,
+      amountPaid: totalPaid,
+      requestedStatus: paymentStatus
+    });
+    const changeDue = sanitizeAmount(Math.max(0, totalPaid - invoiceTotals.grandTotal));
+    const finalPaymentStatus = settlement.paymentStatus;
 
     const invoiceSeq = await nextSequence(`invoice:${req.branchId}`);
     const invoiceNoStr = `INV-${invoiceSeq}`;
@@ -154,25 +153,25 @@ const payBill = async (req, res) => {
     if (payments.length === 1) {
       order.paymentMethod = payments[0].method;
     } else if (payments.length > 1) {
-      order.paymentMethod = 'split';
+      order.paymentMethod = 'other';
     } else {
-      order.paymentMethod = paymentMethod || 'unpaid';
+      order.paymentMethod = paymentMethod || undefined;
     }
     
     order.paymentRemark = payments.length > 0 ? `Paid using ${payments.map(p => p.method).join(', ')}` : 'Unpaid/Credit';
     order.paidAt = new Date();
     order.paidBy = req.user._id;
-    order.subTotal = subTotal;
-    order.discountType = discountType;
-    order.discountValue = Number(discountValue || 0);
-    order.discountAmount = discountAmt;
-    order.taxRate = Number(taxRate || 0);
-    order.taxAmount = taxAmount;
-    order.tipsAmount = Number(tipsAmount || 0);
-    order.roundOff = Number(roundOff || 0);
-    order.taxableAmount = taxableAmount;
-    order.finalAmount = finalAmount;
-    order.tenderAmount = Number(totalPaid || tenderAmount || 0);
+    order.subTotal = invoiceTotals.subTotal;
+    order.discountType = invoiceTotals.discountType;
+    order.discountValue = invoiceTotals.discountValue;
+    order.discountAmount = invoiceTotals.discountAmount;
+    order.taxRate = invoiceTotals.taxRate;
+    order.taxAmount = invoiceTotals.taxAmount;
+    order.tipsAmount = invoiceTotals.tipsAmount;
+    order.roundOff = invoiceTotals.roundOff;
+    order.taxableAmount = invoiceTotals.taxableAmount;
+    order.finalAmount = invoiceTotals.grandTotal;
+    order.tenderAmount = totalPaid || sanitizeAmount(tenderAmount || 0);
     order.changeDue = changeDue;
     if (customerId) order.customerId = customerId;
     if (customerName) order.customerName = customerName;
@@ -211,8 +210,14 @@ const payBill = async (req, res) => {
       discountAmount: order.discountAmount,
       taxRate: order.taxRate,
       taxAmount: order.taxAmount,
+      taxableAmount: order.taxableAmount,
+      tipsAmount: order.tipsAmount,
+      roundOff: order.roundOff,
       grandTotal: order.finalAmount,
-      amountPaid: amountPaid,
+      amountPaid: settlement.amountPaid,
+      paymentMethods: payments.map((entry) => entry.method),
+      orderType: order.orderType,
+      customerName: order.customerName || customerName || '',
       waiterId: order.createdBy?._id,
       waiterName: order.createdBy?.name,
       createdBy: req.user._id,
@@ -222,8 +227,8 @@ const payBill = async (req, res) => {
     const invoiceDoc = salesInvoice[0];
 
     // 4. Create Payment Records
-    if (amountPaid > 0 && payments.length > 0) {
-      let remainingToApply = amountPaid; // We only record up to the grandTotal as revenue
+    if (settlement.amountPaid > 0 && payments.length > 0) {
+      let remainingToApply = settlement.amountPaid;
       
       const paymentDocs = [];
       for (const p of payments) {

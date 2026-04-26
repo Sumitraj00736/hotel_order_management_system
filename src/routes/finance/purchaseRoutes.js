@@ -15,7 +15,7 @@ router.post(
   '/',
   requirePermission('billing:edit'),
   [
-    body('amount').isFloat({ min: 0 }),
+    body('amount').optional().isFloat({ min: 0 }),
     body('billDate').optional().isISO8601(),
     body('paymentMethod').optional().isIn(['cash', 'fonepay', 'card', 'bank', 'owner']),
     body('paymentStatus').optional().isIn(['paid', 'unpaid_credit']),

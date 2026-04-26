@@ -27,8 +27,10 @@ const createPayment = async (req, res) => {
     await session.withTransaction(async () => {
       const payload = {
         branchId: req.branchId,
+        invoiceId: req.body.invoiceId || undefined,
         direction: req.body.direction,
         amount: MathUtils.roundAmount(req.body.amount),
+        entryType: req.body.entryType || 'normal',
         accountHead: req.body.accountHead,
         partyType: req.body.partyType,
         partyId: req.body.partyId,
@@ -60,8 +62,10 @@ const updatePayment = async (req, res) => {
     let payment;
     await session.withTransaction(async () => {
       const update = {
+        invoiceId: req.body.invoiceId !== undefined ? req.body.invoiceId : undefined,
         direction: req.body.direction,
         amount: req.body.amount !== undefined ? MathUtils.roundAmount(req.body.amount) : undefined,
+        entryType: req.body.entryType,
         accountHead: req.body.accountHead,
         partyType: req.body.partyType,
         partyId: req.body.partyId,
@@ -121,4 +125,3 @@ const deletePayment = async (req, res) => {
 };
 
 module.exports = { listPayments, createPayment, updatePayment, deletePayment };
-
