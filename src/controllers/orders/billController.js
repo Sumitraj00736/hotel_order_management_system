@@ -11,6 +11,7 @@ const {
 } = require('../../utils/finance/calculations');
 const {
   buildCheckoutComputation,
+  reconcileInvoiceSettlement,
   buildPaymentDocuments
 } = require('../../utils/orders/checkout');
 
@@ -84,7 +85,6 @@ const payBill = async (req, res) => {
       taxRate = 0,
       tipsAmount = 0,
       roundOff = 0,
-      tenderAmount = 0,
       customerName,
       customerId
     } = req.body;
@@ -95,6 +95,10 @@ const payBill = async (req, res) => {
       .populate('createdBy', 'name email role')
       .populate('kitchenAssigned', 'name email role')
       .session(session);
+    let existingInvoice = await SalesInvoice.findOne({
+      orderId: req.params.id,
+      ...(req.branchId ? { branchId: req.branchId } : {})
+    }).session(session);
 
     if (!order) {
       await session.abortTransaction();
@@ -124,12 +128,27 @@ const payBill = async (req, res) => {
       tenderAmount,
       payments
     });
-    const { invoiceTotals, settlement, changeDue, totalPaid, resolvedPaymentMethod, paymentRemark } = checkout;
+    const { invoiceTotals, changeDue, totalPaid, resolvedPaymentMethod, paymentRemark } = checkout;
     payments = checkout.payments;
-    const finalPaymentStatus = settlement.paymentStatus;
+    const settlementState = reconcileInvoiceSettlement({
+      invoiceTotals,
+      currentRequestPaid: totalPaid,
+      previousAmountPaid: existingInvoice?.amountPaid || 0,
+      requestedStatus: paymentStatus
+    });
+    const { cumulativeSettlement, incrementalApplied } = settlementState;
+    const finalPaymentStatus = cumulativeSettlement.paymentStatus;
 
-    const invoiceSeq = await nextSequence(`invoice:${req.branchId}`);
-    const invoiceNoStr = `INV-${invoiceSeq}`;
+    if (existingInvoice?.paymentStatus === 'paid' || existingInvoice?.status === 'void') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Invoice is already settled and cannot accept another payment' });
+    }
+
+    let invoiceNoStr = order.invoiceNo;
+    if (!invoiceNoStr) {
+      const invoiceSeq = await nextSequence(`invoice:${req.branchId}`);
+      invoiceNoStr = `INV-${invoiceSeq}`;
+    }
     
     // 1. Update Order
     order.invoiceNo = order.invoiceNo || invoiceNoStr;
@@ -150,7 +169,7 @@ const payBill = async (req, res) => {
     order.roundOff = invoiceTotals.roundOff;
     order.taxableAmount = invoiceTotals.taxableAmount;
     order.finalAmount = invoiceTotals.grandTotal;
-    order.tenderAmount = totalPaid || sanitizeAmount(tenderAmount || 0);
+    order.tenderAmount = cumulativeSettlement.amountPaid;
     order.changeDue = changeDue;
     if (customerId) order.customerId = customerId;
     if (customerName) order.customerName = customerName;
@@ -169,51 +188,92 @@ const payBill = async (req, res) => {
       }
     }
 
-    // 3. Create SalesInvoice
-    const salesInvoice = await SalesInvoice.create([{
-      branchId: req.branchId,
-      orderId: order._id,
-      customerId: order.customerId || undefined,
-      invoiceNo: order.invoiceNo,
-      tableNumber: order.table?.tableNumber,
-      items: order.items.map((item) => ({
+    // 3. Create or update SalesInvoice
+    const paymentMethods = Array.from(
+      new Set([...(existingInvoice?.paymentMethods || []), ...payments.map((entry) => entry.method).filter(Boolean)])
+    );
+
+    if (existingInvoice) {
+      existingInvoice.customerId = order.customerId || existingInvoice.customerId;
+      existingInvoice.invoiceNo = order.invoiceNo;
+      existingInvoice.tableNumber = order.table?.tableNumber;
+      existingInvoice.items = order.items.map((item) => ({
         menuItem: item.menuItem?._id,
         name: item.menuItem?.name || item.name || 'Item',
         quantity: item.quantity,
         priceAtOrderTime: item.priceAtOrderTime,
         lineTotal: item.quantity * item.priceAtOrderTime
-      })),
-      subTotal: order.subTotal,
-      discountType: order.discountType,
-      discountValue: order.discountValue,
-      discountAmount: order.discountAmount,
-      taxRate: order.taxRate,
-      taxAmount: order.taxAmount,
-      taxableAmount: order.taxableAmount,
-      tipsAmount: order.tipsAmount,
-      roundOff: order.roundOff,
-      grandTotal: order.finalAmount,
-      amountPaid: settlement.amountPaid,
-      paymentMethods: payments.map((entry) => entry.method),
-      orderType: order.orderType,
-      customerName: order.customerName || customerName || '',
-      waiterId: order.createdBy?._id,
-      waiterName: order.createdBy?.name,
-      createdBy: req.user._id,
-      closedAt: new Date()
-    }], { session });
+      }));
+      existingInvoice.subTotal = order.subTotal;
+      existingInvoice.discountType = order.discountType;
+      existingInvoice.discountValue = order.discountValue;
+      existingInvoice.discountAmount = order.discountAmount;
+      existingInvoice.taxRate = order.taxRate;
+      existingInvoice.taxAmount = order.taxAmount;
+      existingInvoice.taxableAmount = order.taxableAmount;
+      existingInvoice.tipsAmount = order.tipsAmount;
+      existingInvoice.roundOff = order.roundOff;
+      existingInvoice.grandTotal = order.finalAmount;
+      existingInvoice.amountPaid = cumulativeSettlement.amountPaid;
+      existingInvoice.amountDue = cumulativeSettlement.amountDue;
+      existingInvoice.paymentStatus = finalPaymentStatus;
+      existingInvoice.paymentMethods = paymentMethods;
+      existingInvoice.orderType = order.orderType;
+      existingInvoice.customerName = order.customerName || customerName || existingInvoice.customerName || '';
+      existingInvoice.waiterId = order.createdBy?._id;
+      existingInvoice.waiterName = order.createdBy?.name;
+      existingInvoice.closedAt = new Date();
+      await existingInvoice.save({ session });
+    } else {
+      const salesInvoice = await SalesInvoice.create([{
+        branchId: req.branchId,
+        orderId: order._id,
+        customerId: order.customerId || undefined,
+        invoiceNo: order.invoiceNo,
+        tableNumber: order.table?.tableNumber,
+        items: order.items.map((item) => ({
+          menuItem: item.menuItem?._id,
+          name: item.menuItem?.name || item.name || 'Item',
+          quantity: item.quantity,
+          priceAtOrderTime: item.priceAtOrderTime,
+          lineTotal: item.quantity * item.priceAtOrderTime
+        })),
+        subTotal: order.subTotal,
+        discountType: order.discountType,
+        discountValue: order.discountValue,
+        discountAmount: order.discountAmount,
+        taxRate: order.taxRate,
+        taxAmount: order.taxAmount,
+        taxableAmount: order.taxableAmount,
+        tipsAmount: order.tipsAmount,
+        roundOff: order.roundOff,
+        grandTotal: order.finalAmount,
+        amountPaid: cumulativeSettlement.amountPaid,
+        amountDue: cumulativeSettlement.amountDue,
+        paymentStatus: finalPaymentStatus,
+        paymentMethods,
+        orderType: order.orderType,
+        customerName: order.customerName || customerName || '',
+        waiterId: order.createdBy?._id,
+        waiterName: order.createdBy?.name,
+        createdBy: req.user._id,
+        closedAt: new Date()
+      }], { session });
 
-    const invoiceDoc = salesInvoice[0];
+      existingInvoice = salesInvoice[0];
+    }
+
+    const invoiceDoc = existingInvoice;
 
     // 4. Create Payment Records
-    if (settlement.amountPaid > 0 && payments.length > 0) {
+    if (incrementalApplied > 0 && payments.length > 0) {
       const paymentDocs = buildPaymentDocuments({
         branchId: req.branchId,
         invoiceId: invoiceDoc._id,
         customerId: invoiceDoc.customerId || undefined,
         customerName: customerName || invoiceDoc.customerName || 'Walk-in',
         payments,
-        settledAmount: settlement.amountPaid,
+        settledAmount: incrementalApplied,
         closedAt: invoiceDoc.closedAt,
         createdBy: req.user._id
       });

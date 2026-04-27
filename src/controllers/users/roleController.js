@@ -95,6 +95,10 @@ const createRole = async (req, res) => {
   const { name, description, color, permissions } = req.body;
   if (!name) return res.status(400).json({ message: 'Role name required' });
   const normalizedName = name.toLowerCase().trim();
+  const existing = await Role.findOne({ branchId: req.branchId, name: normalizedName });
+  if (existing) {
+    return res.status(409).json({ message: 'Role name already exists in this branch' });
+  }
   const role = await Role.create({
     branchId: req.branchId,
     name: normalizedName,
@@ -109,19 +113,58 @@ const updateRole = async (req, res) => {
   const update = { ...req.body };
   if (update.name) update.name = update.name.toLowerCase().trim();
   if (update.description) update.description = update.description.trim();
-  if (update.permissions) {
-    const roleDoc = await Role.findOne({ _id: req.params.id, branchId: req.branchId }).select('name');
-    if (roleDoc?.name) {
-      update.permissions = sanitizeRolePermissions(roleDoc.name, update.permissions);
+  const roleDoc = await Role.findOne({ _id: req.params.id, branchId: req.branchId });
+  if (!roleDoc) return res.status(404).json({ message: 'Role not found' });
+
+  const previousRoleName = roleDoc.name;
+  const nextRoleName = update.name || previousRoleName;
+
+  if (roleDoc.isDefault && update.name && update.name !== previousRoleName) {
+    return res.status(400).json({ message: 'Default role name cannot be changed' });
+  }
+
+  if (update.name && update.name !== previousRoleName) {
+    const duplicate = await Role.findOne({
+      branchId: req.branchId,
+      name: update.name,
+      _id: { $ne: req.params.id }
+    });
+    if (duplicate) {
+      return res.status(409).json({ message: 'Role name already exists in this branch' });
     }
   }
-  const role = await Role.findOneAndUpdate(
-    { _id: req.params.id, branchId: req.branchId },
-    update,
-    { new: true }
+
+  if (update.permissions) {
+    update.permissions = sanitizeRolePermissions(nextRoleName, update.permissions);
+  }
+
+  Object.assign(roleDoc, update);
+  await roleDoc.save();
+
+  const membershipUpdate = {
+    role: nextRoleName,
+    permissions: sanitizeRolePermissions(nextRoleName, roleDoc.permissions || [])
+  };
+
+  const membershipDocs = await UserBranchRole.find({
+    branchId: req.branchId,
+    role: previousRoleName
+  }).select('userId');
+
+  await UserBranchRole.updateMany(
+    { branchId: req.branchId, role: previousRoleName },
+    membershipUpdate
   );
-  if (!role) return res.status(404).json({ message: 'Role not found' });
-  return res.json(role);
+
+  const affectedUserIds = membershipDocs.map((membership) => membership.userId).filter(Boolean);
+  if (affectedUserIds.length > 0) {
+    await User.updateMany(
+      { _id: { $in: affectedUserIds }, role: previousRoleName },
+      { role: nextRoleName }
+    );
+  }
+
+  return res.json(roleDoc);
 };
 
 const deleteRole = async (req, res) => {
@@ -129,6 +172,10 @@ const deleteRole = async (req, res) => {
   if (!role) return res.status(404).json({ message: 'Role not found' });
   if (role.isDefault || DEFAULT_ROLE_SEEDS.some((seed) => seed.name === role.name)) {
     return res.status(400).json({ message: 'Default roles cannot be deleted' });
+  }
+  const usersUsingRole = await UserBranchRole.countDocuments({ branchId: req.branchId, role: role.name });
+  if (usersUsingRole > 0) {
+    return res.status(400).json({ message: 'Cannot delete role while users are assigned to it' });
   }
   await Role.findByIdAndDelete(role._id);
   return res.json({ message: 'Role deleted' });

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   buildCheckoutComputation,
+  reconcileInvoiceSettlement,
   buildPaymentDocuments
 } = require('../src/utils/orders/checkout');
 
@@ -98,4 +99,20 @@ test('buildPaymentDocuments caps applied rows to settled amount', () => {
       createdBy: 'user-1'
     }
   ]);
+});
+
+test('reconcileInvoiceSettlement applies repeat payments without recreating prior paid amount', () => {
+  const result = reconcileInvoiceSettlement({
+    invoiceTotals: { grandTotal: 1000 },
+    previousAmountPaid: 400,
+    currentRequestPaid: 700,
+    requestedStatus: 'paid'
+  });
+
+  assert.equal(result.previousAmountPaid, 400);
+  assert.equal(result.currentRequestPaid, 700);
+  assert.equal(result.cumulativeSettlement.amountPaid, 1000);
+  assert.equal(result.cumulativeSettlement.amountDue, 0);
+  assert.equal(result.cumulativeSettlement.paymentStatus, 'paid');
+  assert.equal(result.incrementalApplied, 600);
 });

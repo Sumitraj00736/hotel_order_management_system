@@ -10,7 +10,7 @@ const router = express.Router();
 
 router.use(auth, branchScope);
 
-router.get('/me', requirePermission('staff:view'), (req, res) => listPromotions({ ...req, params: { id: req.user._id } }, res));
+router.get('/me', (req, res) => listPromotions({ ...req, params: { id: req.user._id } }, res));
 router.get('/:id', requirePermission('staff:view'), listPromotions);
 router.post(
   '/:id',

@@ -1,5 +1,6 @@
 const SalesInvoice = require('../../models/finance/SalesInvoice');
 const Branch = require('../../models/core/Branch');
+const { buildSelfProfileEditPolicy } = require('../../utils/auth/profileAccess');
 
 const getProfile = async (req, res) => {
   const user = req.user;
@@ -8,6 +9,11 @@ const getProfile = async (req, res) => {
   if (req.branchId) {
     activeBranch = await Branch.findById(req.branchId).select('name code address active').lean();
   }
+
+  const editPolicy = buildSelfProfileEditPolicy(user, {
+    branchRole: req.branchRole,
+    permissions: req.branchPermissions || []
+  });
 
   return res.json({
     id: user._id,
@@ -36,6 +42,7 @@ const getProfile = async (req, res) => {
       : null,
     branchRole: req.branchRole || null,
     permissions: req.branchPermissions || [],
+    editPolicy,
     memberships: (req.branchMemberships || []).map((membership) => ({
       id: membership._id,
       branchId: membership.branchId,
@@ -49,6 +56,10 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   const user = req.user;
+  const editPolicy = buildSelfProfileEditPolicy(user, {
+    branchRole: req.branchRole,
+    permissions: req.branchPermissions || []
+  });
 
   const updates = {
     name: req.body.name?.trim(),
@@ -60,6 +71,17 @@ const updateProfile = async (req, res) => {
     emergencyContactName: req.body.emergencyContactName?.trim(),
     emergencyContactPhone: req.body.emergencyContactPhone?.trim()
   };
+
+  const blockedFields = Object.entries(updates)
+    .filter(([key, value]) => value !== undefined && editPolicy.editableFields[key] === false)
+    .map(([key]) => key);
+
+  if (blockedFields.length) {
+    return res.status(403).json({
+      message: 'Some profile fields are locked and require admin approval to change.',
+      blockedFields
+    });
+  }
 
   if (updates.phone && updates.phone !== user.phone) {
     const existing = await user.constructor.findOne({
@@ -81,7 +103,9 @@ const updateProfile = async (req, res) => {
     }
   }
 
-  const mutableFields = Object.entries(updates).filter(([, value]) => value !== undefined);
+  const mutableFields = Object.entries(updates).filter(
+    ([key, value]) => value !== undefined && editPolicy.editableFields[key] !== false
+  );
   mutableFields.forEach(([key, value]) => {
     user[key] = value;
   });

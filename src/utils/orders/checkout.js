@@ -73,6 +73,33 @@ const buildCheckoutComputation = ({
   };
 };
 
+const reconcileInvoiceSettlement = ({
+  invoiceTotals,
+  currentRequestPaid = 0,
+  previousAmountPaid = 0,
+  requestedStatus = 'paid'
+}) => {
+  const safePreviousAmountPaid = sanitizeAmount(previousAmountPaid);
+  const safeCurrentRequestPaid = sanitizeAmount(currentRequestPaid);
+  const cumulativeRequestedPaid = sanitizeAmount(safePreviousAmountPaid + safeCurrentRequestPaid);
+  const cumulativeSettlement = deriveSettlement({
+    grandTotal: invoiceTotals.grandTotal,
+    amountPaid: cumulativeRequestedPaid,
+    requestedStatus
+  });
+
+  const incrementalApplied = sanitizeAmount(
+    Math.max(0, cumulativeSettlement.amountPaid - safePreviousAmountPaid)
+  );
+
+  return {
+    previousAmountPaid: safePreviousAmountPaid,
+    currentRequestPaid: safeCurrentRequestPaid,
+    cumulativeSettlement,
+    incrementalApplied
+  };
+};
+
 const buildPaymentDocuments = ({
   branchId,
   invoiceId,
@@ -120,5 +147,6 @@ const buildPaymentDocuments = ({
 
 module.exports = {
   buildCheckoutComputation,
+  reconcileInvoiceSettlement,
   buildPaymentDocuments
 };
