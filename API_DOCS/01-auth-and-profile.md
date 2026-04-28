@@ -49,12 +49,51 @@ Creates a new top-level account and starts business setup.
 
 #### Typical request fields
 
-- `name`
-- `email`
-- `phone`
-- `password`
-- `cafeName`
-- `branchName`
+- `name` (String)
+- `email` (String)
+- `phone` (String)
+- `password` (String)
+- `cafeName` (String)
+- `branchName` (String)
+
+#### Example Payload
+
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "9800000000",
+  "password": "password123",
+  "cafeName": "Central Cafe",
+  "branchName": "Main Branch"
+}
+```
+
+#### Example Response (201 Created)
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "60d5ec18...",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "9800000000",
+    "role": "superadmin"
+  },
+  "branches": [
+    {
+      "branchId": "60d5ec19...",
+      "branchName": "Main Branch",
+      "code": "main-branch-kq2b1z",
+      "orgName": "Central Cafe",
+      "orgSlug": "central-cafe",
+      "role": "superadmin",
+      "permissions": ["*"]
+    }
+  ]
+}
+```
 
 #### Important rules
 
@@ -85,6 +124,42 @@ Logs a user in using credentials.
 #### Required fields
 
 - `password`
+- One of: `email`, `phone`, or `identifier`
+
+#### Example Payload
+
+```json
+{
+  "identifier": "john@example.com",
+  "password": "password123"
+}
+```
+
+#### Example Response (200 OK)
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "60d5ec18...",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "9800000000",
+    "role": "superadmin"
+  },
+  "branches": [
+    {
+      "branchId": "60d5ec19...",
+      "branchName": "Main Branch",
+      "code": "main-branch-kq2b1z",
+      "orgName": "Central Cafe",
+      "orgSlug": "central-cafe",
+      "role": "superadmin",
+      "permissions": ["*"]
+    }
+  ]
+}
+```
 
 #### Important rules
 
@@ -104,7 +179,31 @@ Logs a user in using Firebase-issued identity token.
 
 #### Required fields
 
-- `idToken`
+- `idToken` (Firebase ID Token)
+
+#### Example Payload
+
+```json
+{
+  "idToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjY0..."
+}
+```
+
+#### Example Response (200 OK)
+
+```json
+{
+  "user": {
+    "id": "60d5ec18...",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "9800000000",
+    "role": "staff",
+    "picture": "https://lh3.googleusercontent.com/..."
+  },
+  "branches": [ ... ]
+}
+```
 
 #### Important rules
 
@@ -126,6 +225,22 @@ Starts password reset flow.
 
 - `email`
 
+#### Example Payload
+
+```json
+{
+  "email": "john@example.com"
+}
+```
+
+#### Example Response (200 OK)
+
+```json
+{
+  "message": "If an account exists, a reset link has been sent."
+}
+```
+
 #### Developer notes
 
 Used for recovery, not authenticated session usage.
@@ -141,6 +256,23 @@ Completes password reset using issued token.
 - `token`
 - `password`
 
+#### Example Payload
+
+```json
+{
+  "token": "abcdef123456...",
+  "password": "newpassword123"
+}
+```
+
+#### Example Response (200 OK)
+
+```json
+{
+  "message": "Password reset successful. You can now login."
+}
+```
+
 #### Important rules
 
 - password minimum length validation applies
@@ -154,6 +286,23 @@ Checks phone-related auth conditions.
 #### Required fields
 
 - `phone`
+
+#### Example Payload
+
+```json
+{
+  "phone": "9800000000"
+}
+```
+
+#### Example Response (200 OK)
+
+```json
+{
+  "message": "User found",
+  "name": "John Doe"
+}
+```
 
 #### Developer notes
 
@@ -174,10 +323,61 @@ Returns currently authenticated user profile in branch context.
 - role-aware rendering
 - permission-aware UI logic
 
+#### Example Response (200 OK)
+
+```json
+{
+  "id": "60d5ec18...",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "9800000000",
+  "profileImageUrl": "",
+  "role": "superadmin",
+  "branch": {
+    "id": "60d5ec19...",
+    "name": "Main Branch",
+    "code": "main-branch-kq2b1z",
+    "address": "123 Street",
+    "active": true
+  },
+  "branchRole": "superadmin",
+  "permissions": ["*"],
+  "memberships": [ ... ]
+}
+```
+
 #### Important behavior
 
 - identity alone is not enough
 - branch membership context matters
+
+### `PUT /api/profile/me`
+
+#### Purpose
+
+Updates the currently authenticated user's profile information.
+
+#### Optional fields
+
+- `name`, `phone`, `profileImageUrl`, `address`, `emergencyContactName`, `emergencyContactPhone`
+
+#### Example Payload
+
+```json
+{
+  "name": "John Updated",
+  "address": "456 New Street"
+}
+```
+
+#### Example Response (200 OK)
+
+Returns the updated profile object (same format as `GET /api/profile/me`).
+
+#### Important behavior
+
+- Some fields may be locked based on `editPolicy` (e.g., salary, date of joining).
+- Phone duplicates are checked if changed.
 
 ### `GET /api/profile/waiter/analytics`
 
@@ -189,6 +389,18 @@ Returns waiter-specific analytics for the logged-in user.
 
 - waiter dashboard metrics
 - staff performance summary
+
+#### Example Response (200 OK)
+
+```json
+{
+  "summary": {
+    "totalSales": 1250.5,
+    "totalOrders": 15
+  },
+  "note": "More detailed charts can be derived from /api/reports/analytics if needed."
+}
+```
 
 #### Important behavior
 
