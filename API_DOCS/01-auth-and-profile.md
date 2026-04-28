@@ -154,7 +154,7 @@ Logs a user in using credentials.
       "code": "main-branch-kq2b1z",
       "orgName": "Central Cafe",
       "orgSlug": "central-cafe",
-      "role": "superadmin",
+      "role": "superadmin", // Identical to user.role
       "permissions": ["*"]
     }
   ]
@@ -340,7 +340,7 @@ Returns currently authenticated user profile in branch context.
     "address": "123 Street",
     "active": true
   },
-  "branchRole": "superadmin",
+  "branchRole": "superadmin", // Identical to 'role'
   "permissions": ["*"],
   "memberships": [ ... ]
 }
@@ -350,6 +350,7 @@ Returns currently authenticated user profile in branch context.
 
 - identity alone is not enough
 - branch membership context matters
+- **Note**: `role` and `branchRole` in the response both refer to the same user role within the active branch context.
 
 ### `PUT /api/profile/me`
 
