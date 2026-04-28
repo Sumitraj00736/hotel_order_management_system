@@ -85,6 +85,7 @@ const payBill = async (req, res) => {
       taxRate = 0,
       tipsAmount = 0,
       roundOff = 0,
+      tenderAmount = 0,
       customerName,
       customerId
     } = req.body;
