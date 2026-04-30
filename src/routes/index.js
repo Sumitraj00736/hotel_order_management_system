@@ -38,7 +38,8 @@ const routeDefinitions = [
   { path: '/api/settings', router: require('./settings/settingsRoutes') },
   { path: '/api/branches', router: require('./core/branchRoutes') },
   { path: '/api/support', router: require('./support/supportRoutes') },
-  { path: '/api/public', router: require('./public/publicRoutes') }
+  { path: '/api/public', router: require('./public/publicRoutes') },
+  { path: '/api/honor-admin', router: require('./honor/honorAdminRoutes') }
 ];
 
 const registerApiRoutes = (app) => {
