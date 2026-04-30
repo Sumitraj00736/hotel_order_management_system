@@ -65,6 +65,7 @@ const branchScope = async (req, res, next) => {
   req.branchId = active.branchId;
   req.branchRole = active.role;
   req.branchPermissions = active.permissions || [];
+  req.orgId = active.orgId;
 
   return next();
 };

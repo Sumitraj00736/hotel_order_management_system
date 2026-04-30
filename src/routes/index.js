@@ -36,6 +36,7 @@ const routeDefinitions = [
   { path: '/api/activity-logs', router: require('./notifications/activityLogRoutes') },
   { path: '/api/promotions', router: require('./notifications/promotionRoutes') },
   { path: '/api/settings', router: require('./settings/settingsRoutes') },
+  { path: '/api/branches', router: require('./core/branchRoutes') },
   { path: '/api/support', router: require('./support/supportRoutes') },
   { path: '/api/public', router: require('./public/publicRoutes') }
 ];
