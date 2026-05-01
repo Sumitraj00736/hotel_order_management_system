@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const activityLogSchema = new mongoose.Schema(
   {
-    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
+    orgId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', index: true },
     title: { type: String, required: true, trim: true },
     type: { type: String, trim: true },
     action: { type: String, trim: true, index: true },

@@ -3,32 +3,7 @@ const ActivityLog = require('../../models/notifications/ActivityLog');
 const buildActivityPayload = ({
   req,
   branchId,
-  title,
-  type,
-  action,
-  description,
-  performedBy,
-  entityType,
-  entityId,
-  metadata
-}) => ({
-  branchId,
-  title,
-  type,
-  action,
-  description,
-  performedBy,
-  requestId: req?.requestId,
-  entityType,
-  entityId: entityId ? String(entityId) : undefined,
-  ipAddress: req?.ip,
-  userAgent: req?.headers?.['user-agent'],
-  metadata
-});
-
-const logActivity = async ({
-  req,
-  branchId,
+  orgId,
   title,
   type,
   action,
@@ -38,10 +13,44 @@ const logActivity = async ({
   entityId,
   metadata
 }) => {
-  if (!branchId) return null;
+  const payload = {
+    branchId,
+    title,
+    type,
+    action,
+    description,
+    performedBy,
+    requestId: req?.requestId,
+    entityType,
+    entityId: entityId ? String(entityId) : undefined,
+    ipAddress: req?.ip,
+    userAgent: req?.headers?.['user-agent'],
+    metadata
+  };
+
+  if (orgId) payload.orgId = orgId;
+
+  return payload;
+};
+
+const logActivity = async ({
+  req,
+  branchId,
+  orgId,
+  title,
+  type,
+  action,
+  description,
+  performedBy,
+  entityType,
+  entityId,
+  metadata
+}) => {
+  if (!branchId && !orgId) return null;
   return ActivityLog.create(buildActivityPayload({
     req,
     branchId,
+    orgId,
     title,
     type,
     action,
