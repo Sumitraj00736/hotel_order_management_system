@@ -14,6 +14,11 @@ const {
   reconcileInvoiceSettlement,
   buildPaymentDocuments
 } = require('../../utils/orders/checkout');
+const {
+  getIdempotencyContext,
+  beginIdempotentRequest,
+  completeIdempotentRequest
+} = require('../../utils/http/idempotency');
 
 const generateBill = async (req, res) => {
   const order = await Order.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })
@@ -75,6 +80,7 @@ const payBill = async (req, res) => {
   try {
     session = await Order.startSession();
     session.startTransaction();
+    let idempotencyRecordId = null;
 
     let { payments } = req.body;
     const {
@@ -90,6 +96,17 @@ const payBill = async (req, res) => {
       customerId
     } = req.body;
 
+    const idempotency = await beginIdempotentRequest(
+      getIdempotencyContext(req, `orders.bill.pay:${req.params.id}`),
+      session
+    );
+    if (idempotency.mode === 'replay' || idempotency.mode === 'conflict') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(idempotency.status).json(idempotency.body);
+    }
+    idempotencyRecordId = idempotency.record?._id;
+
     const order = await Order.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) })
       .populate('table')
       .populate('items.menuItem')
@@ -103,17 +120,20 @@ const payBill = async (req, res) => {
 
     if (!order) {
       await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ message: 'Order not found' });
     }
 
     // Only allow waiters to pay their own orders
     if (req.user.role === 'waiter' && order.createdBy?._id?.toString() !== req.user._id.toString()) {
       await session.abortTransaction();
+      session.endSession();
       return res.status(403).json({ message: 'Forbidden' });
     }
 
     if (order.status === 'paid') {
       await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ message: 'Order already paid' });
     }
 
@@ -142,6 +162,7 @@ const payBill = async (req, res) => {
 
     if (existingInvoice?.paymentStatus === 'paid' || existingInvoice?.status === 'void') {
       await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ message: 'Invoice is already settled and cannot accept another payment' });
     }
 
@@ -283,7 +304,17 @@ const payBill = async (req, res) => {
         await Payment.insertMany(paymentDocs, { session });
       }
     }
-    
+
+    const responseBody = { message: 'Payment recorded', orderId: order._id, status: order.status };
+    await completeIdempotentRequest({
+      recordId: idempotencyRecordId,
+      status: 200,
+      body: responseBody,
+      resourceType: 'sales_invoice',
+      resourceId: invoiceDoc?._id,
+      session
+    });
+
     await session.commitTransaction();
     session.endSession();
 
@@ -325,8 +356,7 @@ const payBill = async (req, res) => {
       description: `${req.user?.name || 'Staff'} checked out order (INV: ${populated.invoiceNo})`,
       performedBy: req.user?._id
     });
-
-    return res.json({ message: 'Payment recorded', orderId: order._id, status: order.status });
+    return res.json(responseBody);
   } catch (error) {
     if (session) {
       try {

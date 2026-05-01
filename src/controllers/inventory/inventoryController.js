@@ -8,6 +8,16 @@ const MenuItem = require('../../models/menu/MenuItem');
 const roundAmount = (value) => Math.round(Number(value || 0) * 100) / 100;
 const branchFilter = (req) => (req.branchId ? { branchId: req.branchId } : {});
 
+const buildInventoryConflictMessage = ({ ingredient, requestedDelta, currentStock }) => {
+  if (!ingredient) {
+    return 'Ingredient not found';
+  }
+  if (requestedDelta < 0) {
+    return `Insufficient stock for ${ingredient.name} (need ${Math.abs(requestedDelta)}${ingredient.unit}, have ${currentStock}${ingredient.unit})`;
+  }
+  return `Inventory changed for ${ingredient.name}. Please retry.`;
+};
+
 const listIngredients = async (req, res) => {
   const filter = {};
   if (req.branchId) filter.branchId = req.branchId;
@@ -188,11 +198,50 @@ const updateIngredient = async (req, res) => {
         throw new Error('currentStock cannot be negative');
       }
 
-      ingredient = await Ingredient.findOneAndUpdate(
-        { _id: req.params.id, ...branchFilter(req) },
-        updates,
-        { new: true, session }
-      );
+      if (hasStockChange) {
+        const stockDelta = roundAmount(nextStock - previousStock);
+        const { currentStock, ...nonStockUpdates } = updates;
+        const query = {
+          _id: req.params.id,
+          ...branchFilter(req),
+          currentStock: previousStock
+        };
+        if (stockDelta < 0) {
+          query.currentStock = { $gte: Math.abs(stockDelta), $eq: previousStock };
+        }
+
+        ingredient = await Ingredient.findOneAndUpdate(
+          query,
+          {
+            $set: {
+              ...nonStockUpdates,
+              ...(stockDelta > 0 ? { lastRestockedAt: new Date() } : {})
+            },
+            $inc: { currentStock: stockDelta }
+          },
+          { new: true, session }
+        );
+
+        if (!ingredient) {
+          const current = await Ingredient.findOne({
+            _id: req.params.id,
+            ...branchFilter(req)
+          }).session(session);
+          throw new Error(
+            buildInventoryConflictMessage({
+              ingredient: current,
+              requestedDelta: stockDelta,
+              currentStock: Number(current?.currentStock || 0)
+            })
+          );
+        }
+      } else {
+        ingredient = await Ingredient.findOneAndUpdate(
+          { _id: req.params.id, ...branchFilter(req) },
+          { $set: updates },
+          { new: true, session }
+        );
+      }
 
       if (hasStockChange) {
         const delta = roundAmount(nextStock - previousStock);
@@ -219,30 +268,41 @@ const updateIngredient = async (req, res) => {
 };
 
 const restockIngredient = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
+    let ingredient;
     const { amount, note } = req.body;
-    if (!amount || amount <= 0) {
+    const numericAmount = Number(amount);
+    if (!numericAmount || numericAmount <= 0) {
       return res.status(400).json({ message: 'Amount must be positive' });
     }
-    const ingredient = await Ingredient.findOne({ _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) });
-    if (!ingredient) {
-      return res.status(404).json({ message: 'Ingredient not found' });
-    }
-    ingredient.currentStock += Number(amount);
-    ingredient.lastRestockedAt = new Date();
-    await ingredient.save();
+    await session.withTransaction(async () => {
+      ingredient = await Ingredient.findOneAndUpdate(
+        { _id: req.params.id, ...(req.branchId ? { branchId: req.branchId } : {}) },
+        {
+          $inc: { currentStock: numericAmount },
+          $set: { lastRestockedAt: new Date() }
+        },
+        { new: true, session }
+      );
+      if (!ingredient) {
+        throw new Error('Ingredient not found');
+      }
 
-    await StockTransaction.create({
-      branchId: req.branchId,
-      ingredient: ingredient._id,
-      delta: Number(amount),
-      reason: 'restock',
-      note,
-      createdBy: req.user?._id
+      await StockTransaction.create([{
+        branchId: req.branchId,
+        ingredient: ingredient._id,
+        delta: numericAmount,
+        reason: 'restock',
+        note,
+        createdBy: req.user?._id
+      }], { session });
     });
     return res.json(ingredient);
   } catch (error) {
-    return res.status(400).json({ message: 'Restock failed', error: error.message });
+    return res.status(error.message === 'Ingredient not found' ? 404 : 400).json({ message: 'Restock failed', error: error.message });
+  } finally {
+    session.endSession();
   }
 };
 

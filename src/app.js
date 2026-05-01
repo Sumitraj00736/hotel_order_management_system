@@ -13,6 +13,7 @@ const requestContext = require('./middleware/requestContext');
 require('./models/finance/JournalVoucher');
 require('./models/finance/CashBankAccount');
 require('./models/finance/DaybookSession');
+require('./models/core/IdempotencyRequest');
 
 const app = express();
 

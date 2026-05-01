@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const Payment = require('../../models/finance/Payment');
 const MathUtils = require('../../utils/mathUtils');
 const { logActivity } = require('../../utils/notifications/activity');
+const {
+  getIdempotencyContext,
+  beginIdempotentRequest,
+  completeIdempotentRequest
+} = require('../../utils/http/idempotency');
 
 const listPayments = async (req, res) => {
   try {
@@ -27,6 +32,15 @@ const createPayment = async (req, res) => {
   try {
     let payment;
     await session.withTransaction(async () => {
+      const idempotency = await beginIdempotentRequest(
+        getIdempotencyContext(req, 'finance.payment.create'),
+        session
+      );
+      if (idempotency.mode === 'replay' || idempotency.mode === 'conflict') {
+        payment = { __idempotencyEarlyReturn: true, status: idempotency.status, body: idempotency.body };
+        return;
+      }
+
       const payload = {
         branchId: req.branchId,
         invoiceId: req.body.invoiceId || undefined,
@@ -68,7 +82,19 @@ const createPayment = async (req, res) => {
           referenceNo: payload.referenceNo
         }
       });
+
+      await completeIdempotentRequest({
+        recordId: idempotency.record?._id,
+        status: 201,
+        body: newPayment.toObject(),
+        resourceType: 'payment',
+        resourceId: newPayment._id,
+        session
+      });
     });
+    if (payment?.__idempotencyEarlyReturn) {
+      return res.status(payment.status).json(payment.body);
+    }
     return res.status(201).json(payment);
   } catch (error) {
     req.log?.error('Create payment failed', { error });
