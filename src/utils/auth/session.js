@@ -4,8 +4,8 @@ const UserBranchRole = require('../../models/users/UserBranchRole');
 const { initFirebase, admin, isConfigured } = require('../firebase/admin');
 
 const hydrateUserRole = ({ user, memberships = [] }) => {
-  if (user && memberships.some((membership) => membership?.isOwner)) {
-    user.role = 'superadmin';
+  if (user) {
+    user.isBranchOwner = memberships.some((membership) => membership?.isOwner);
   }
   return user;
 };

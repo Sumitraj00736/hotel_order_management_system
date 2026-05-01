@@ -99,9 +99,14 @@ const buildIngredientDeltaMap = (items = []) => {
 };
 
 const applyInventoryDelta = async ({ branchId, purchaseId, beforeItems = [], afterItems = [], userId, session }) => {
+  if (!session) {
+    throw new Error('Purchase inventory updates require an active database session');
+  }
+
   const beforeMap = buildIngredientDeltaMap(beforeItems);
   const afterMap = buildIngredientDeltaMap(afterItems);
   const keys = new Set([...beforeMap.keys(), ...afterMap.keys()]);
+  const missing = [];
 
   for (const key of keys) {
     const before = beforeMap.get(key)?.delta || 0;
@@ -109,23 +114,50 @@ const applyInventoryDelta = async ({ branchId, purchaseId, beforeItems = [], aft
     const delta = sanitizeAmount(after - before);
     if (!delta) continue;
 
-    const ingredient = await Ingredient.findOne({
-      _id: afterMap.get(key)?.ingredientId || beforeMap.get(key)?.ingredientId,
+    const ingredientId = afterMap.get(key)?.ingredientId || beforeMap.get(key)?.ingredientId;
+    const query = {
+      _id: ingredientId,
       ...(branchId ? { branchId } : {})
-    }).session(session);
+    };
+    if (delta < 0) {
+      query.currentStock = { $gte: Math.abs(delta) };
+    }
+    const ingredient = await Ingredient.findOneAndUpdate(
+      query,
+      {
+        $inc: { currentStock: delta },
+        $set: { lastRestockedAt: new Date() }
+      },
+      { new: true, session }
+    );
 
     if (!ingredient) {
-      throw new Error('Linked ingredient not found for purchase item');
+      missing.push({ ingredientId, delta });
+      continue;
     }
+  }
 
-    const nextStock = sanitizeAmount((ingredient.currentStock || 0) + delta);
-    if (nextStock < 0) {
-      throw new Error(`Insufficient stock to adjust ingredient ${ingredient.name}`);
-    }
-
-    ingredient.currentStock = nextStock;
-    ingredient.lastRestockedAt = new Date();
-    await ingredient.save({ session });
+  if (missing.length > 0) {
+    const ingredients = await Ingredient.find({
+      _id: { $in: missing.map((entry) => entry.ingredientId) },
+      ...(branchId ? { branchId } : {})
+    }).session(session);
+    const ingredientMap = new Map(ingredients.map((ingredient) => [ingredient._id.toString(), ingredient]));
+    const details = missing.map((entry) => {
+      const ingredient = ingredientMap.get(String(entry.ingredientId));
+      if (!ingredient) {
+        return `Unknown ingredient (${entry.ingredientId})`;
+      }
+      if (entry.delta < 0) {
+        return `${ingredient.name} (need ${Math.abs(entry.delta)}${ingredient.unit}, have ${ingredient.currentStock}${ingredient.unit})`;
+      }
+      return ingredient.name;
+    });
+    throw new Error(
+      details.some((detail) => detail.includes('need '))
+        ? `Insufficient stock to adjust purchase: ${details.join(', ')}`
+        : 'Linked ingredient not found for purchase item'
+    );
   }
 
   if (keys.size > 0) {

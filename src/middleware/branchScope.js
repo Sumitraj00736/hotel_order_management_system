@@ -1,5 +1,4 @@
 const UserBranchRole = require('../models/users/UserBranchRole');
-const Branch = require('../models/core/Branch');
 const { pickActiveMembership } = require('../utils/branch/access');
 
 // Attaches branchId and branchRole to req based on header x-branch-id and user membership
@@ -15,31 +14,8 @@ const branchScope = async (req, res, next) => {
   });
   req.branchMemberships = memberships;
 
-  // If no memberships recorded, allow legacy single-tenant behavior
   if (!memberships.length) {
-    const fallbackBranch = await Branch.findOne();
-    if (!fallbackBranch) {
-      return res.status(403).json({ message: 'No branch memberships. Contact admin.' });
-    }
-    const { resolveRolePermissions } = require('../utils/auth/permissions');
-    await UserBranchRole.findOneAndUpdate(
-      { userId: req.user._id, branchId: fallbackBranch._id },
-      {
-        userId: req.user._id,
-        branchId: fallbackBranch._id,
-        orgId: fallbackBranch.orgId,
-        role: req.user.role,
-        permissions: resolveRolePermissions({ roleName: req.user.role }),
-        active: true,
-        status: 'active'
-      },
-      { upsert: true, new: true }
-    );
-    memberships = await UserBranchRole.find({
-      userId: req.user._id,
-      $or: [{ active: true }, { status: 'active' }]
-    });
-    req.branchMemberships = memberships;
+    return res.status(403).json({ message: 'No active branch membership. Contact admin.' });
   }
 
   const branchAccess = pickActiveMembership({

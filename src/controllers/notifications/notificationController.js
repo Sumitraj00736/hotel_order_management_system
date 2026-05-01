@@ -45,6 +45,7 @@ const markRead = async (req, res) => {
   const notification = await Notification.findOne({
     _id: req.params.id,
     role: { $in: roleFilter },
+    ...(req.branchId ? { branchId: req.branchId } : {}),
     $or: [{ userId: _id }, { userId: { $exists: false } }]
   });
   if (!notification) {
@@ -59,7 +60,11 @@ const markAllRead = async (req, res) => {
   const { role, _id } = req.user;
   const roleFilter = role === 'superadmin' ? ['admin'] : [role];
   await Notification.updateMany(
-    { role: { $in: roleFilter }, $or: [{ userId: _id }, { userId: { $exists: false } }] },
+    {
+      role: { $in: roleFilter },
+      ...(req.branchId ? { branchId: req.branchId } : {}),
+      $or: [{ userId: _id }, { userId: { $exists: false } }]
+    },
     { $set: { read: true } }
   );
   return res.json({ message: 'All notifications marked as read' });

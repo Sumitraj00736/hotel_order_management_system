@@ -7,6 +7,7 @@ const Role = require('../../models/users/Role');
 const DeletedUser = require('../../models/users/DeletedUser');
 const { logActivity } = require('../../utils/notifications/activity');
 const { resolveRolePermissions, normalizeRoleKey, sanitizeRolePermissions } = require('../../utils/auth/permissions');
+const { normalizeEmail, normalizePhone } = require('../../utils/auth/identity');
 
 const resolveRolePayload = async ({ branchId, roleName, roleId }) => {
   if (roleId) {
@@ -25,6 +26,37 @@ const resolveRolePayload = async ({ branchId, roleName, roleId }) => {
   }
 
   return { role: undefined, permissions: [] };
+};
+
+const findBranchMembership = ({ branchId, userId }) =>
+  UserBranchRole.findOne({ branchId, userId }).populate('userId');
+
+const buildBranchScopedUserPayload = (membership) => {
+  const user = membership?.userId;
+  if (!membership || !user) return null;
+
+  return {
+    _id: user._id,
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: normalizeRoleKey(membership.role || user.role || ''),
+    isOwner: !!membership.isOwner,
+    status: membership.status || (membership.active ? 'active' : 'inactive'),
+    dateOfJoining: user.dateOfJoining,
+    salary: user.salary,
+    shiftStart: user.shiftStart,
+    shiftEnd: user.shiftEnd,
+    profileImageUrl: user.profileImageUrl,
+    citizenshipNumber: user.citizenshipNumber,
+    citizenshipImageUrl: user.citizenshipImageUrl,
+    address: user.address,
+    emergencyContactName: user.emergencyContactName,
+    emergencyContactPhone: user.emergencyContactPhone,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
+  };
 };
 
 const listUsers = async (req, res) => {
@@ -77,11 +109,15 @@ const listUsers = async (req, res) => {
 };
 
 const getUser = async (req, res) => {
-  const user = await User.findById(req.params.id).select('-password');
-  if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+  if (!req.branchId) {
+    return res.status(400).json({ message: 'Branch required' });
   }
-  return res.json(user);
+
+  const membership = await findBranchMembership({ branchId: req.branchId, userId: req.params.id });
+  if (!membership?.userId) {
+    return res.status(404).json({ message: 'User not found in this branch' });
+  }
+  return res.json(buildBranchScopedUserPayload(membership));
 };
 
 const createUser = async (req, res) => {
@@ -93,11 +129,24 @@ const createUser = async (req, res) => {
 
     const branch = await Branch.findById(req.branchId);
     if (!branch) return res.status(404).json({ message: 'Branch not found' });
-    const existing = await User.findOne({ $or: [{ email }, { phone }] });
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedPhone = phone ? normalizePhone(phone) : '';
+    const existingLookup = [{ email: normalizedEmail }];
+    if (normalizedPhone) existingLookup.push({ phone: normalizedPhone });
+    const existing = await User.findOne({ $or: existingLookup });
     if (existing) {
+      const existingMemberships = await UserBranchRole.find({ userId: existing._id });
+      const crossOrgMembership = existingMemberships.find(
+        (membership) => String(membership.orgId) !== String(branch.orgId)
+      );
+      if (crossOrgMembership) {
+        return res.status(409).json({
+          message: 'Existing account belongs to another organization. Cross-organization linking is disabled.'
+        });
+      }
+
       const membership = await UserBranchRole.findOne({ userId: existing._id, branchId: req.branchId, active: true });
       if (membership) return res.status(409).json({ message: 'User already exists in this branch' });
-      const hashedExisting = existing.password; // reuse stored hash
       const membershipStatus = status || 'active';
       const resolved = await resolveRolePayload({ branchId: req.branchId, roleName: role, roleId });
       await UserBranchRole.create({
@@ -127,14 +176,20 @@ const createUser = async (req, res) => {
           role: resolved?.role || (role ? normalizeRoleKey(role) : 'waiter')
         }
       });
-      return res.status(201).json({ _id: existing._id, id: existing._id, name: existing.name, email: existing.email, role: normalizeRoleKey(role || '') });
+      return res.status(201).json({
+        _id: existing._id,
+        id: existing._id,
+        name: existing.name,
+        email: existing.email,
+        role: normalizeRoleKey((resolved?.role || role || existing.role || '').toString())
+      });
     }
     const hashed = await bcrypt.hash(password, 10);
     const resolved = await resolveRolePayload({ branchId: req.branchId, roleName: role, roleId });
     const user = await User.create({
       name,
-      email,
-      phone,
+      email: normalizedEmail,
+      phone: normalizedPhone || undefined,
       password: hashed,
       role: resolved?.role || (role ? normalizeRoleKey(role) : undefined),
       dateOfJoining,
@@ -212,11 +267,19 @@ const updateUserStatus = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { name, email, phone, role, roleId, password, dateOfJoining, salary, shiftStart, shiftEnd } = req.body;
+    if (!req.branchId) {
+      return res.status(400).json({ message: 'Branch required' });
+    }
+
+    const membership = await UserBranchRole.findOne({ userId: req.params.id, branchId: req.branchId });
+    if (!membership) {
+      return res.status(404).json({ message: 'User not found in this branch' });
+    }
+
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const membership = await UserBranchRole.findOne({ userId: user._id, branchId: req.branchId });
     const beforeSnapshot = {
       name: user.name,
       email: user.email,
@@ -231,12 +294,14 @@ const updateUser = async (req, res) => {
       return res.status(403).json({ message: 'Owner role cannot be changed' });
     }
 
-    if ((email && email !== user.email) || (phone && phone !== user.phone)) {
+    const normalizedEmail = email ? normalizeEmail(email) : undefined;
+    const normalizedPhone = phone ? normalizePhone(phone) : undefined;
+    if ((normalizedEmail && normalizedEmail !== user.email) || (normalizedPhone && normalizedPhone !== user.phone)) {
       // Check if new email/phone is taken by ANOTHER user
       const existing = await User.findOne({ 
         $or: [
-          ...(email ? [{ email }] : []),
-          ...(phone ? [{ phone }] : [])
+          ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+          ...(normalizedPhone ? [{ phone: normalizedPhone }] : [])
         ], 
         _id: { $ne: user._id } 
       });
@@ -244,8 +309,8 @@ const updateUser = async (req, res) => {
       if (existing) {
         return res.status(409).json({ message: 'Email or phone already in use by another account' });
       }
-      if (email) user.email = email;
-      if (phone) user.phone = phone;
+      if (normalizedEmail) user.email = normalizedEmail;
+      if (normalizedPhone) user.phone = normalizedPhone;
     }
 
     if (name) user.name = name;
@@ -346,7 +411,12 @@ const updateUserRole = async (req, res) => {
 };
 
 const deleteUser = async (req, res) => {
-  if (!req.user || req.user.role?.toLowerCase() !== 'superadmin') {
+  if (!req.branchId) {
+    return res.status(400).json({ message: 'Branch required' });
+  }
+
+  const actorRole = normalizeRoleKey(req.branchRole || req.user?.role || '');
+  if (actorRole !== 'superadmin') {
     return res.status(403).json({ message: 'Only superadmin can delete users' });
   }
   const membership = await UserBranchRole.findOne({ userId: req.params.id, branchId: req.branchId });

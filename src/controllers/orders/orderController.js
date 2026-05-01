@@ -15,6 +15,12 @@ const {
   isAllowedOrderStatusTransition
 } = require('../../utils/orders/lifecycle');
 
+const ensureActiveSession = (session) => {
+  if (!session) {
+    throw new Error('Inventory updates require an active database session');
+  }
+};
+
 const buildOrderItems = async (items, branchId) => {
   const menuIds = items.map((item) => item.menuItem);
   const filter = { _id: { $in: menuIds }, isAvailable: true };
@@ -73,15 +79,23 @@ const computeIngredientNeeds = async (orderItems) => {
   return { needs, recipeMap };
 };
 
-const ensureInventoryAvailability = async (orderItems) => {
+const ensureInventoryAvailability = async (orderItems, session) => {
+  ensureActiveSession(session);
   const { needs } = await computeIngredientNeeds(orderItems);
   if (needs.size === 0) return; // no recipes configured
-  const ingredients = await Ingredient.find({ _id: { $in: Array.from(needs.keys()) } });
+
+  const ingredients = await Ingredient.find({ _id: { $in: Array.from(needs.keys()) } }).session(session);
   const missing = [];
+  const foundIds = new Set(ingredients.map((ing) => ing._id.toString()));
   ingredients.forEach((ing) => {
     const required = needs.get(ing._id.toString()) || 0;
     if (ing.currentStock < required) {
       missing.push(`${ing.name} (need ${required}${ing.unit}, have ${ing.currentStock}${ing.unit})`);
+    }
+  });
+  Array.from(needs.keys()).forEach((ingredientId) => {
+    if (!foundIds.has(ingredientId)) {
+      missing.push(`Unknown ingredient (${ingredientId})`);
     }
   });
   if (missing.length > 0) {
@@ -90,6 +104,7 @@ const ensureInventoryAvailability = async (orderItems) => {
 };
 
 const consumeInventory = async (orderItems, orderId, userId, session) => {
+  ensureActiveSession(session);
   const { needs } = await computeIngredientNeeds(orderItems);
   const ingredientIds = Array.from(needs.keys());
   if (ingredientIds.length === 0) return;
@@ -98,11 +113,13 @@ const consumeInventory = async (orderItems, orderId, userId, session) => {
   // eslint-disable-next-line no-restricted-syntax
   for (const ingredientId of ingredientIds) {
     const required = needs.get(ingredientId) || 0;
-    const ingredient = await Ingredient.findById(ingredientId).session(session);
+    const ingredient = await Ingredient.findOneAndUpdate(
+      { _id: ingredientId, currentStock: { $gte: required } },
+      { $inc: { currentStock: -required } },
+      { new: true, session }
+    );
     if (!ingredient) continue;
-    ingredient.currentStock -= required;
-    await ingredient.save({ session });
-    
+
     const unitCost = Number(ingredient.defaultPrice || 0);
     const totalCost = unitCost * required;
 
@@ -116,33 +133,21 @@ const consumeInventory = async (orderItems, orderId, userId, session) => {
       createdBy: userId
     });
   }
+  if (transactions.length !== ingredientIds.length) {
+    throw new Error('Insufficient stock during order processing. Please retry.');
+  }
   if (transactions.length > 0) {
     await StockTransaction.insertMany(transactions, { session });
   }
 };
 
 const applyInventoryDelta = async (oldItems, newItems, orderId, userId, session) => {
+  ensureActiveSession(session);
   const { needs: oldNeeds } = await computeIngredientNeeds(oldItems);
   const { needs: newNeeds } = await computeIngredientNeeds(newItems);
 
   const ingredientIds = new Set([...Array.from(oldNeeds.keys()), ...Array.from(newNeeds.keys())]);
   const missing = [];
-  // First validate additional requirements
-  // eslint-disable-next-line no-restricted-syntax
-  for (const ingredientId of ingredientIds) {
-    const prev = oldNeeds.get(ingredientId) || 0;
-    const next = newNeeds.get(ingredientId) || 0;
-    const delta = next - prev;
-    if (delta > 0) {
-      const ing = await Ingredient.findById(ingredientId);
-      if (ing && ing.currentStock < delta) {
-        missing.push(`${ing.name} (need +${delta}${ing.unit}, have ${ing.currentStock}${ing.unit})`);
-      }
-    }
-  }
-  if (missing.length > 0) {
-    throw new Error(`Insufficient stock: ${missing.join(', ')}`);
-  }
 
   const transactions = [];
   // Apply deltas
@@ -152,11 +157,13 @@ const applyInventoryDelta = async (oldItems, newItems, orderId, userId, session)
     const next = newNeeds.get(ingredientId) || 0;
     const delta = next - prev;
     if (delta === 0) continue;
-    const ing = await Ingredient.findById(ingredientId).session(session);
+    const query = delta > 0
+      ? { _id: ingredientId, currentStock: { $gte: delta } }
+      : { _id: ingredientId };
+    const update = { $inc: { currentStock: -delta } };
+    const ing = await Ingredient.findOneAndUpdate(query, update, { new: true, session });
     if (!ing) continue;
-    ing.currentStock -= delta; // delta positive consumes, negative adds back
-    await ing.save({ session });
-    
+
     const unitCost = Number(ing.defaultPrice || 0);
     const totalCost = unitCost * Math.abs(delta);
 
@@ -169,6 +176,34 @@ const applyInventoryDelta = async (oldItems, newItems, orderId, userId, session)
       referenceOrder: orderId,
       createdBy: userId
     });
+  }
+  const expectedChanges = Array.from(ingredientIds).filter((ingredientId) => {
+    const prev = oldNeeds.get(ingredientId) || 0;
+    const next = newNeeds.get(ingredientId) || 0;
+    return next - prev !== 0;
+  }).length;
+  if (transactions.length !== expectedChanges) {
+    const unresolvedIds = Array.from(ingredientIds).filter((ingredientId) => {
+      const prev = oldNeeds.get(ingredientId) || 0;
+      const next = newNeeds.get(ingredientId) || 0;
+      return next - prev > 0;
+    });
+    if (unresolvedIds.length > 0) {
+      const unresolvedIngredients = await Ingredient.find({ _id: { $in: unresolvedIds } }).session(session);
+      unresolvedIngredients.forEach((ing) => {
+        const prev = oldNeeds.get(ing._id.toString()) || 0;
+        const next = newNeeds.get(ing._id.toString()) || 0;
+        const delta = next - prev;
+        if (delta > 0 && ing.currentStock < delta) {
+          missing.push(`${ing.name} (need +${delta}${ing.unit}, have ${ing.currentStock}${ing.unit})`);
+        }
+      });
+    }
+    throw new Error(
+      missing.length > 0
+        ? `Insufficient stock: ${missing.join(', ')}`
+        : 'Insufficient stock during order update. Please retry.'
+    );
   }
   if (transactions.length > 0) {
     await StockTransaction.insertMany(transactions, { session });
@@ -287,7 +322,7 @@ const createOrder = async (req, res) => {
     }
 
     const { orderItems, totalAmount } = await buildOrderItems(items, req.branchId);
-    await ensureInventoryAvailability(orderItems);
+    await ensureInventoryAvailability(orderItems, session);
     const kotSeq = await nextSequence(`kot:${req.branchId}`);
     const [order] = await Order.create(
       [

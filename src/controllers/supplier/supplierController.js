@@ -137,7 +137,7 @@ const getSupplierLedger = async (req, res) => {
     const supplierId = req.params.id;
     const branchFilter = req.branchId ? { branchId: req.branchId } : {};
 
-    const supplier = await Supplier.findById(supplierId);
+    const supplier = await Supplier.findOne({ _id: supplierId, ...branchFilter });
     if (!supplier) return res.status(404).json({ message: 'Supplier not found' });
 
     const purchases = await Purchase.find({ ...branchFilter, supplierId }).sort({ paidAt: -1 });

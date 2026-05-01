@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, unique: true, sparse: true, trim: true },
     password: { type: String }, // Optional for Firebase/Social users
     firebaseUid: { type: String, unique: true, sparse: true },
+    isPlatformAdmin: { type: Boolean, default: false },
     role: { type: String, enum: ['superadmin','admin', 'waiter', 'kitchen'], required: true, lowercase: true },
     dateOfJoining: { type: Date },
     salary: { type: Number, min: 0 },
