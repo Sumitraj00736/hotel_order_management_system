@@ -6,6 +6,9 @@ const User = require('../../models/users/User');
 const UserBranchRole = require('../../models/users/UserBranchRole');
 const ActivityLog = require('../../models/notifications/ActivityLog');
 const Order = require('../../models/orders/Order');
+const MenuItem = require('../../models/menu/MenuItem');
+const Table = require('../../models/tables/Table');
+const Customer = require('../../models/customers/Customer');
 const { buildActivityPayload } = require('../../utils/notifications/activity');
 const { PLAN_LIMIT_KEYS, PLAN_PRESETS, normalizeTier, applyPlanOverrides } = require('./planPresets');
 
@@ -144,25 +147,48 @@ const ensureSubscription = async (branchId) => {
 };
 
 const buildBranchUsageMap = async (branchIds) => {
-  const [branchCounts, memberCounts] = await Promise.all([
-    Branch.find({ _id: { $in: branchIds } }).select('_id').lean(),
+  const [memberCounts, tableCounts, dishCounts, customerCounts] = await Promise.all([
     UserBranchRole.aggregate([
       { $match: { branchId: { $in: branchIds }, status: 'active' } },
+      { $group: { _id: '$branchId', total: { $sum: 1 } } }
+    ]),
+    Table.aggregate([
+      { $match: { branchId: { $in: branchIds }, isTrashed: { $ne: true } } },
+      { $group: { _id: '$branchId', total: { $sum: 1 } } }
+    ]),
+    MenuItem.aggregate([
+      { $match: { branchId: { $in: branchIds } } },
+      { $group: { _id: '$branchId', total: { $sum: 1 } } }
+    ]),
+    Customer.aggregate([
+      { $match: { branchId: { $in: branchIds } } },
       { $group: { _id: '$branchId', total: { $sum: 1 } } }
     ])
   ]);
 
   const usageMap = new Map();
-  branchCounts.forEach((branch) => {
-    usageMap.set(String(branch._id), {
-      members: 0
+  branchIds.forEach((id) => {
+    usageMap.set(String(id), {
+      members: 0,
+      tables: 0,
+      dishes: 0,
+      customers: 0
     });
   });
-  memberCounts.forEach((entry) => {
-    const current = usageMap.get(String(entry._id)) || {};
-    current.members = entry.total;
-    usageMap.set(String(entry._id), current);
-  });
+
+  const fillMap = (counts, key) => {
+    counts.forEach((entry) => {
+      const current = usageMap.get(String(entry._id)) || {};
+      current[key] = entry.total;
+      usageMap.set(String(entry._id), current);
+    });
+  };
+
+  fillMap(memberCounts, 'members');
+  fillMap(tableCounts, 'tables');
+  fillMap(dishCounts, 'dishes');
+  fillMap(customerCounts, 'customers');
+
   return usageMap;
 };
 

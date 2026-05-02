@@ -4,6 +4,7 @@ const auth = require('../../middleware/auth');
 const branchScope = require('../../middleware/branchScope');
 const requirePermission = require('../../middleware/requirePermission');
 const validate = require('../../middleware/validate');
+const { limitTables } = require('../../middleware/checkPlanLimit');
 const { listTables, getTable, createTable, updateTable, deleteTable, freeTable } = require('../../controllers/tables/tableController');
 
 const router = express.Router();
@@ -16,6 +17,7 @@ router.get('/:id', requirePermission('tables:view'), getTable);
 router.post(
   '/',
   requirePermission('tables:edit'),
+  limitTables,
   [
     body('tableNumber').isInt({ min: 1 }),
     body('name').optional().isString(),

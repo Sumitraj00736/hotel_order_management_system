@@ -4,6 +4,7 @@ const auth = require('../../middleware/auth');
 const branchScope = require('../../middleware/branchScope');
 const requirePermission = require('../../middleware/requirePermission');
 const validate = require('../../middleware/validate');
+const { limitDishes } = require('../../middleware/checkPlanLimit');
 const { listMenu, getMenuItem, createMenuItem, updateMenuItem, deleteMenuItem } = require('../../controllers/menu/menuController');
 
 const router = express.Router();
@@ -16,6 +17,7 @@ router.get('/:id', requirePermission('menu:view'), getMenuItem);
 router.post(
   '/',
   requirePermission('menu:edit'),
+  limitDishes,
   [
     body('name').notEmpty(),
     body('category').optional().isMongoId(),

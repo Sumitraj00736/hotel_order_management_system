@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const PlatformAdmin = require('../../models/honor/PlatformAdmin');
+const PlatformAdmin = require('../../models/platform/PlatformAdmin');
 
 const login = async (req, res) => {
   try {

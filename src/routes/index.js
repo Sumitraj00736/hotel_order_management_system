@@ -39,6 +39,7 @@ const routeDefinitions = [
   { path: '/api/branches', router: require('./core/branchRoutes') },
   { path: '/api/support', router: require('./support/supportRoutes') },
   { path: '/api/public', router: require('./public/publicRoutes') },
+  { path: '/api/subscription', router: require('./subscription/subscriptionRoutes') },
   { path: '/api/platform/control', router: require('./platform/honorAdminRoutes') },
   { path: '/api/platform/auth', router: require('./platform/platformAuthRoutes') }
 ];

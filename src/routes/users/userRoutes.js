@@ -4,6 +4,7 @@ const auth = require('../../middleware/auth');
 const branchScope = require('../../middleware/branchScope');
 const requirePermission = require('../../middleware/requirePermission');
 const validate = require('../../middleware/validate');
+const { limitMembers } = require('../../middleware/checkPlanLimit');
 const { listUsers, getUser, createUser, updateUser, deleteUser, updateUserStatus, updateUserRole } = require('../../controllers/users/userController');
 
 const router = express.Router();
@@ -15,6 +16,7 @@ router.get('/:id', requirePermission('staff:view'), getUser);
 router.post(
   '/',
   requirePermission('staff:edit'),
+  limitMembers,
   [
     body('name').notEmpty(),
     body('email').isEmail(),

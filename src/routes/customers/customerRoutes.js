@@ -4,6 +4,7 @@ const auth = require('../../middleware/auth');
 const branchScope = require('../../middleware/branchScope');
 const requirePermission = require('../../middleware/requirePermission');
 const validate = require('../../middleware/validate');
+const { limitCustomers } = require('../../middleware/checkPlanLimit');
 const {
   listCustomers,
   createCustomer,
@@ -20,6 +21,7 @@ router.get('/', requirePermission('customers:view'), listCustomers);
 router.post(
   '/',
   requirePermission('customers:edit'),
+  limitCustomers,
   [body('name').notEmpty().withMessage('Customer name is required')],
   validate,
   createCustomer
