@@ -9,7 +9,7 @@ const {
   archiveRestaurant,
   restoreRestaurant,
   getRestaurantAudit
-} = require('../../controllers/platform/honorAdminController');
+} = require('../../controllers/platform/adminController');
 
 const router = express.Router();
 

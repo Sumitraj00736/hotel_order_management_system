@@ -39,14 +39,27 @@ const routeDefinitions = [
   { path: '/api/branches', router: require('./core/branchRoutes') },
   { path: '/api/support', router: require('./support/supportRoutes') },
   { path: '/api/public', router: require('./public/publicRoutes') },
-  { path: '/api/subscription', router: require('./subscription/subscriptionRoutes') },
-  { path: '/api/platform/control', router: require('./platform/honorAdminRoutes') },
+  { path: '/api/subscription', router: require('./platform/branchSubscriptionRoutes') },
+  { path: '/api/platform/control', router: require('./platform/adminRoutes') },
   { path: '/api/platform/auth', router: require('./platform/platformAuthRoutes') }
 ];
 
+const { checkFeature } = require('../middleware/checkPlanLimit');
+
 const registerApiRoutes = (app) => {
   routeDefinitions.forEach(({ path, router }) => {
-    app.use(path, router);
+    // Apply feature gates to specific modules
+    if (path.startsWith('/api/inventory')) {
+      app.use(path, checkFeature('inventory'), router);
+    } else if (['/api/daybook', '/api/purchases', '/api/expenses', '/api/incomes', '/api/sales-returns', '/api/payments'].includes(path)) {
+      app.use(path, checkFeature('accounting'), router);
+    } else if (path === '/api/customers') {
+      // Allow viewing customers (Basic), but limit advanced CRM features if needed
+      // For now, let's just use the count limit for creation which is already in customerRoutes
+      app.use(path, router);
+    } else {
+      app.use(path, router);
+    }
   });
 };
 

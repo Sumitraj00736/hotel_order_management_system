@@ -1,4 +1,4 @@
-const Subscription = require('../../models/core/Subscription');
+const Subscription = require('../../models/platform/Subscription');
 const MenuItem = require('../../models/menu/MenuItem');
 const Table = require('../../models/tables/Table');
 const UserBranchRole = require('../../models/users/UserBranchRole');

@@ -43,6 +43,31 @@ const branchScope = async (req, res, next) => {
   req.branchPermissions = active.permissions || [];
   req.orgId = active.orgId;
 
+  // PRODUCTION LEVEL: Strict Subscription Enforcement
+  try {
+    const Subscription = require('../models/platform/Subscription');
+    const subscription = await Subscription.findOne({ branchId: req.branchId }).lean();
+    
+    if (subscription) {
+      const isExpired = subscription.expiryDate && new Date(subscription.expiryDate) < new Date();
+      const isInactive = subscription.status !== 'active';
+
+      if (isExpired || isInactive) {
+        // Block WRITE operations if expired/inactive
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+          return res.status(403).json({
+            code: isExpired ? 'SUBSCRIPTION_EXPIRED' : 'SUBSCRIPTION_INACTIVE',
+            message: isExpired ? 'Your subscription has expired. Please renew.' : `Your subscription is ${subscription.status}.`,
+            upgradeRequired: true
+          });
+        }
+      }
+      req.subscription = subscription;
+    }
+  } catch (err) {
+    console.error('[branchScope] Subscription check failed:', err.message);
+  }
+
   return next();
 };
 

@@ -1,7 +1,7 @@
 const express = require('express');
 const auth = require('../../middleware/auth');
 const branchScope = require('../../middleware/branchScope');
-const { getMySubscription } = require('../../controllers/subscription/subscriptionController');
+const { getMySubscription } = require('../../controllers/platform/branchSubscriptionController');
 
 const router = express.Router();
 

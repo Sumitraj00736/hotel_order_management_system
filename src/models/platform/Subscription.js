@@ -7,6 +7,12 @@ const subscriptionSchema = new mongoose.Schema(
     tier: { type: String, default: 'free' },
     activeSince: { type: Date, default: Date.now },
     status: { type: String, default: 'active' },
+    expiryDate: { type: Date },
+    features: {
+      type: Map,
+      of: Boolean,
+      default: {}
+    },
     maxMembers: { type: Number, default: 2 },
     maxTables: { type: Number, default: 10 },
     maxCustomers: { type: Number, default: 10 },

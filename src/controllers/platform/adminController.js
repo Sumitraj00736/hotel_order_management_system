@@ -1,7 +1,7 @@
 const Organization = require('../../models/core/Organization');
 const Branch = require('../../models/core/Branch');
-const Subscription = require('../../models/core/Subscription');
-const SubscriptionHistory = require('../../models/core/SubscriptionHistory');
+const Subscription = require('../../models/platform/Subscription');
+const SubscriptionHistory = require('../../models/platform/SubscriptionHistory');
 const User = require('../../models/users/User');
 const UserBranchRole = require('../../models/users/UserBranchRole');
 const ActivityLog = require('../../models/notifications/ActivityLog');
@@ -520,6 +520,8 @@ const updateBranchSubscription = async (req, res) => {
     subscription.tier = effectivePlan.tier;
     subscription.planName = effectivePlan.planName;
     subscription.status = 'active';
+    subscription.expiryDate = expiryDate ? new Date(expiryDate) : null;
+    subscription.features = effectivePlan.features || {};
     PLAN_LIMIT_KEYS.forEach((key) => {
       subscription[key] = effectivePlan[key];
     });
