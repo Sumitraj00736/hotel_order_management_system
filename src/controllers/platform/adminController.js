@@ -19,34 +19,44 @@ const formatDate = (value) => (value ? new Date(value).toISOString() : null);
 const formatStatus = (active, archivedAt) => (active === false || archivedAt ? 'Archived' : 'Active');
 
 const summarizeBranchPlans = (branches) => {
-  const tiers = branches
-    .map((branch) => normalizeTier(branch.subscription?.tier || branch.subscription?.planName || 'free'))
+  const plans = branches
+    .map((branch) => {
+      const sub = branch.subscription;
+      if (!sub) return null;
+      return {
+        id: sub.planId ? String(sub.planId) : 'legacy',
+        name: sub.planName || 'Free Plan'
+      };
+    })
     .filter(Boolean);
 
-  if (!tiers.length) {
+  if (!plans.length) {
     return {
       label: 'No Branches',
+      planId: 'none',
       tier: 'none',
       mixed: false
     };
   }
 
-  const distinct = [...new Set(tiers)];
-  if (distinct.length > 1) {
+  const distinctIds = [...new Set(plans.map(p => p.id))];
+  if (distinctIds.length > 1) {
     return {
       label: 'Mixed / Custom',
+      planId: 'mixed',
       tier: 'mixed',
       mixed: true
     };
   }
 
-  const matchedPreset = PLAN_PRESETS[distinct[0]] || null;
   return {
-    label: matchedPreset?.planName || branches[0]?.subscription?.planName || 'Custom',
-    tier: distinct[0],
+    label: plans[0].name,
+    planId: plans[0].id,
+    tier: plans[0].name.toLowerCase().replace(/\s+/g, '-'),
     mixed: false
   };
 };
+
 
 const getSortValue = (row, sortBy) => {
   switch (sortBy) {
@@ -257,7 +267,7 @@ const filterAndPaginateRows = (rows, query) => {
   const {
     search = '',
     status = 'active',
-    plan = 'all',
+    plan_id = 'all',
     sortBy = 'name',
     sortDir = 'asc'
   } = query;
@@ -265,13 +275,12 @@ const filterAndPaginateRows = (rows, query) => {
   const limit = Math.min(Math.max(Number(query.limit) || DEFAULT_PAGE_SIZE, 1), 100);
   const normalizedSearch = String(search).trim().toLowerCase();
   const normalizedStatus = String(status || 'active').toLowerCase();
-  const normalizedPlan = normalizeTier(plan);
 
   let filtered = rows.filter((row) => {
     if (normalizedStatus === 'active' && row.status !== 'Active') return false;
     if (normalizedStatus === 'archived' && row.status !== 'Archived') return false;
     if (normalizedStatus !== 'all' && normalizedStatus !== 'active' && normalizedStatus !== 'archived') return false;
-    if (normalizedPlan && normalizedPlan !== 'all' && row.planSummary.tier !== normalizedPlan) return false;
+    if (plan_id !== 'all' && row.planSummary.planId !== plan_id) return false;
     if (!normalizedSearch) return true;
 
     const haystack = [
@@ -306,46 +315,73 @@ const filterAndPaginateRows = (rows, query) => {
 
 const getPlatformStats = async (req, res) => {
   try {
-    const organizations = await Organization.find().lean();
-    const rows = await buildRestaurantRows(organizations);
-    const totalBranches = rows.reduce((sum, row) => sum + row.branchesCount, 0);
-    const totalUsers = rows.reduce((sum, row) => sum + row.usersCount, 0);
-    const activeRestaurants = rows.filter((row) => row.status === 'Active').length;
-    const archivedRestaurants = rows.filter((row) => row.status === 'Archived').length;
-    const activeSubscriptions = rows.reduce((acc, row) => {
-      if (row.planSummary.tier === 'mixed') {
-        acc.mixed += 1;
-      } else if (row.planSummary.tier && row.planSummary.tier !== 'none') {
-        acc[row.planSummary.tier] = (acc[row.planSummary.tier] || 0) + 1;
-      }
-      return acc;
-    }, { free: 0, basic: 0, pro: 0, enterprise: 0, mixed: 0 });
+    const Plan = require('../../models/platform/Plan');
+    
+    // Time boundaries for percentage changes
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+    const sixtyDaysAgo = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
 
-    const [orderStats] = await Order.aggregate([
-      { $match: { paymentStatus: 'paid' } },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$finalAmount' },
-          totalTransactions: { $sum: 1 }
-        }
+    // Helper to get counts with date filters
+    const getCount = async (model, filter = {}, sinceDate = null, untilDate = null) => {
+      const dateFilter = {};
+      if (sinceDate) dateFilter.$gte = sinceDate;
+      if (untilDate) dateFilter.$lt = untilDate;
+      
+      const finalFilter = { ...filter };
+      // Assuming 'createdAt' is the timestamp field for most models
+      if (Object.keys(dateFilter).length > 0) {
+        finalFilter.createdAt = dateFilter;
       }
-    ]);
+      return model.countDocuments(finalFilter);
+    };
+
+    const calculateChange = (current, previous) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Number((((current - previous) / previous) * 100).toFixed(1));
+    };
+
+    // 1. Total Restaurants
+    const currentRestaurants = await getCount(Organization);
+    const oldRestaurants = await getCount(Organization, {}, sixtyDaysAgo, thirtyDaysAgo);
+    const newRestaurants = await getCount(Organization, {}, thirtyDaysAgo, now);
+
+    // 2. Total Plans (Active)
+    const currentPlans = await Plan.countDocuments({ is_active: true, is_deleted: false });
+
+    // 3. Total Active Subscriptions
+    const currentSubscriptions = await Subscription.countDocuments({ status: 'active' });
+    const oldSubscriptions = await getCount(Subscription, { status: 'active' }, sixtyDaysAgo, thirtyDaysAgo);
+    const newSubscriptions = await getCount(Subscription, { status: 'active' }, thirtyDaysAgo, now);
+
+    // 4. Total Registered Users
+    const currentUsers = await User.countDocuments();
+    const oldUsers = await getCount(User, {}, sixtyDaysAgo, thirtyDaysAgo);
+    const newUsers = await getCount(User, {}, thirtyDaysAgo, now);
+
+    // 5 & 6. Free vs Paid Users
+    // A simplified approach: count subscriptions where planName includes 'Free' or tier is 'free'
+    const freePlanCount = await Subscription.countDocuments({ status: 'active', tier: 'free' });
+    const paidPlanCount = await Subscription.countDocuments({ status: 'active', tier: { $ne: 'free' } });
 
     return res.json({
-      totalRestaurants: rows.length,
-      activeRestaurants,
-      archivedRestaurants,
-      totalBranches,
-      totalUsers,
-      activeSubscriptions,
-      globalRevenue: orderStats?.totalRevenue || 0,
-      globalTransactions: orderStats?.totalTransactions || 0
+      total_restaurants: currentRestaurants,
+      total_plans: currentPlans,
+      active_subscriptions: currentSubscriptions,
+      registered_users: currentUsers,
+      free_plan_users: freePlanCount,
+      paid_plan_users: paidPlanCount,
+      changes: {
+        total_restaurants: calculateChange(newRestaurants, oldRestaurants),
+        active_subscriptions: calculateChange(newSubscriptions, oldSubscriptions),
+        registered_users: calculateChange(newUsers, oldUsers)
+      }
     });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to fetch platform stats', error: error.message });
   }
 };
+
 
 const listRestaurants = async (req, res) => {
   try {
@@ -374,6 +410,56 @@ const listRestaurants = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to list restaurants', error: error.message });
+  }
+};
+
+const exportRestaurantsCSV = async (req, res) => {
+  try {
+    const organizations = await Organization.find().lean();
+    const rows = await buildRestaurantRows(organizations);
+    
+    // We ignore pagination for export, but keep filtering
+    const queryForExport = { ...req.query, page: 1, limit: 1000000 }; 
+    const result = filterAndPaginateRows(rows, queryForExport);
+
+    const data = result.data;
+
+    // CSV Header
+    let csvStr = 'ID,Name,Owner,Owner Email,Branches Count,Users Count,Plan,Status,Joined Date\n';
+
+    data.forEach(row => {
+      // Basic escaping for CSV fields
+      const escape = (str) => `"${String(str || '').replace(/"/g, '""')}"`;
+      
+      // Mask sensitive data
+      const maskEmail = (email) => {
+        if (!email) return '';
+        const parts = email.split('@');
+        if (parts.length !== 2) return email;
+        const name = parts[0];
+        if (name.length <= 2) return `*@${parts[1]}`;
+        return `${name.substring(0, 2)}***@${parts[1]}`;
+      };
+
+      csvStr += [
+        escape(row.id),
+        escape(row.name),
+        escape(row.owner),
+        escape(maskEmail(row.ownerEmail)),
+        escape(row.branchesCount),
+        escape(row.usersCount),
+        escape(row.planSummary.label),
+        escape(row.status),
+        escape(row.createdAt)
+      ].join(',') + '\n';
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="restaurants_export.csv"');
+    
+    return res.send(csvStr);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to export restaurants', error: error.message });
   }
 };
 
@@ -674,6 +760,7 @@ const getRestaurantAudit = async (req, res) => {
 module.exports = {
   getPlatformStats,
   listRestaurants,
+  exportRestaurantsCSV,
   getRestaurantDetail,
   getBranchUsers,
   updateBranchSubscription,

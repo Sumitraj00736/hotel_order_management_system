@@ -3,10 +3,14 @@ const mongoose = require('mongoose');
 const subscriptionSchema = new mongoose.Schema(
   {
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true, unique: true },
+    planId: { type: mongoose.Schema.Types.ObjectId, ref: 'Plan' },
     planName: { type: String, default: 'Free Plan' },
     tier: { type: String, default: 'free' },
     activeSince: { type: Date, default: Date.now },
-    status: { type: String, default: 'active' },
+    status: { type: String, enum: ['active', 'trial', 'cancelled', 'expired'], default: 'active' },
+    trial_ends_at: { type: Date },
+    current_period_start: { type: Date, default: Date.now },
+    current_period_end: { type: Date },
     expiryDate: { type: Date },
     features: {
       type: Map,

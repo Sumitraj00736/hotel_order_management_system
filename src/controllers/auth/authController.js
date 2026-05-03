@@ -10,13 +10,37 @@ const { resolveRolePermissions } = require('../../utils/auth/permissions');
 const { initFirebase, admin } = require('../../utils/firebase/admin');
 const { normalizeEmail, normalizePhone, resolveLoginIdentifier } = require('../../utils/auth/identity');
 
-const createToken = (user) => {
+const generateTokens = async (user) => {
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT secret missing');
   }
-  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: '7d'
+
+  const accessToken = jwt.sign(
+    { id: user._id, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  );
+
+  const refreshToken = jwt.sign(
+    { id: user._id },
+    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+
+  // Store refresh token and prune old ones
+  await User.findByIdAndUpdate(user._id, {
+    $push: {
+      refreshTokens: {
+        $each: [{ token: refreshToken, expiresAt }],
+        $slice: -10 // Keep last 10 sessions/devices
+      }
+    }
   });
+
+  return { accessToken, refreshToken };
 };
 
 const buildMembershipBranchPayload = (membership) => {
@@ -133,9 +157,10 @@ const register = async (req, res) => {
 
     const branches = memberships.map(buildMembershipBranchPayload);
 
-    const token = createToken(user);
+    const { accessToken, refreshToken } = await generateTokens(user);
     return res.status(201).json({
-      token,
+      token: accessToken,
+      refreshToken,
       user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role },
       branches
     });
@@ -196,10 +221,11 @@ const login = async (req, res) => {
     // Determine effective role (Elevate to superadmin if an owner)
     const effectiveRole = memberships.some(m => m.isOwner) ? 'superadmin' : (user.role || 'staff');
 
-    const token = createToken(user);
+    const { accessToken, refreshToken } = await generateTokens(user);
     req.log?.info('Login successful', { userId: user._id.toString(), branches: branches.length });
     return res.json({
-      token,
+      token: accessToken,
+      refreshToken,
       user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: effectiveRole },
       branches
     });
@@ -453,4 +479,37 @@ const checkPhone = async (req, res) => {
   }
 };
 
-module.exports = { register, login, firebaseLogin, forgotPassword, resetPassword, checkPhone };
+const refresh = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ message: 'Refresh token required' });
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
+    const user = await User.findOne({
+      _id: decoded.id,
+      'refreshTokens.token': refreshToken,
+      'refreshTokens.expiresAt': { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid or expired refresh token' });
+    }
+
+    // Generate new pair
+    const tokens = await generateTokens(user);
+
+    // Remove the old refresh token
+    await User.findByIdAndUpdate(user._id, {
+      $pull: { refreshTokens: { token: refreshToken } }
+    });
+
+    return res.json({
+      token: tokens.accessToken,
+      refreshToken: tokens.refreshToken
+    });
+  } catch (error) {
+    return res.status(401).json({ message: 'Token refresh failed', error: error.message });
+  }
+};
+
+module.exports = { register, login, firebaseLogin, forgotPassword, resetPassword, checkPhone, refresh };

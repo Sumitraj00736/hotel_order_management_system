@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const rateLimit = require('express-rate-limit');
-const { register, login, firebaseLogin, forgotPassword, resetPassword, checkPhone } = require('../../controllers/auth/authController');
+const { register, login, firebaseLogin, forgotPassword, resetPassword, checkPhone, refresh } = require('../../controllers/auth/authController');
 const validate = require('../../middleware/validate');
 
 const router = express.Router();
@@ -72,5 +72,6 @@ router.post(
 );
 
 router.post('/check-phone', loginLimiter, [body('phone').notEmpty()], validate, checkPhone);
+router.post('/refresh', [body('refreshToken').notEmpty()], validate, refresh);
 
 module.exports = router;
