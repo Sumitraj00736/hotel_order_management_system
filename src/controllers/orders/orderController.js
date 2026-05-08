@@ -220,14 +220,8 @@ const listOrders = async (req, res) => {
       filter.status = req.query.status;
     }
   } else if (req.query.category) {
-    if (req.query.category === 'active') {
+    if (req.query.category === 'kot' || req.query.category === 'active') {
       filter.status = { $in: ['pending', 'preparing', 'ready', 'served'] };
-    } else if (req.query.category === 'kot') {
-      filter.status = { $in: ['pending', 'preparing', 'ready', 'served'] };
-      // Scope KOT view to orders created today only (kitchen board)
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      filter.createdAt = { $gte: todayStart };
     } else if (req.query.category === 'paid') {
       filter.status = 'paid';
     } else if (req.query.category === 'cancelled') {
