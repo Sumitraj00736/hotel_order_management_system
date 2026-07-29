@@ -29,6 +29,7 @@ router.post(
 router.post(
   '/unsubscribe',
   auth,
+  branchScope,
   [body().custom((value) => {
     if (value?.deviceId || value?.fcmToken) return true;
     throw new Error('deviceId or fcmToken required');
@@ -36,7 +37,7 @@ router.post(
   validate,
   unsubscribe
 );
-router.patch('/toggle', auth, [body('deviceId').notEmpty(), body('enabled').isBoolean()], validate, toggle);
-router.post('/test', auth, [body('title').optional().isString(), body('body').optional().isString()], validate, testPush);
+router.patch('/toggle', auth, branchScope, [body('deviceId').notEmpty(), body('enabled').isBoolean()], validate, toggle);
+router.post('/test', auth, branchScope, [body('title').optional().isString(), body('body').optional().isString()], validate, testPush);
 
 module.exports = router;

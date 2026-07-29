@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 
 const Organization = require('../src/models/core/Organization');
 const Branch = require('../src/models/core/Branch');
-const Subscription = require('../src/models/core/Subscription');
-const SubscriptionHistory = require('../src/models/core/SubscriptionHistory');
+const Subscription = require('../src/models/platform/Subscription');
+const SubscriptionHistory = require('../src/models/platform/SubscriptionHistory');
 const UserBranchRole = require('../src/models/users/UserBranchRole');
 const ActivityLog = require('../src/models/notifications/ActivityLog');
-const controller = require('../src/controllers/honor/honorAdminController');
+const controller = require('../src/controllers/platform/adminController');
 
 function createRes() {
   return {
@@ -60,9 +60,9 @@ test('listRestaurants returns effective plan data with filtering and pagination'
   }, async () => withPatched(Subscription, {
     find: () => ({
       lean: async () => [
-        { branchId: 'branch-1', tier: 'basic', planName: 'Basic' },
-        { branchId: 'branch-2', tier: 'pro', planName: 'Pro' },
-        { branchId: 'branch-3', tier: 'enterprise', planName: 'Enterprise' }
+        { branchId: 'branch-1', tier: 'basic', planName: 'Basic', planId: '507f1f77bcf86cd799439011' },
+        { branchId: 'branch-2', tier: 'pro', planName: 'Pro', planId: '507f1f77bcf86cd799439012' },
+        { branchId: 'branch-3', tier: 'enterprise', planName: 'Enterprise', planId: '507f1f77bcf86cd799439013' }
       ]
     })
   }, async () => withPatched(UserBranchRole, {
@@ -139,7 +139,7 @@ test('updateBranchSubscription applies preset with overrides and writes history'
     const req = {
       params: { branchId: 'branch-1' },
       body: {
-        tier: 'pro',
+        tier: 'premium',
         maxMembers: 25,
         remarks: 'VIP upgrade'
       },
@@ -156,12 +156,12 @@ test('updateBranchSubscription applies preset with overrides and writes history'
 
     assert.equal(res.statusCode, 200);
     assert.equal(saved.called, true);
-    assert.equal(subscriptionDoc.tier, 'pro');
-    assert.equal(subscriptionDoc.planName, 'Pro');
+    assert.equal(subscriptionDoc.tier, 'premium');
+    assert.equal(subscriptionDoc.planName, 'Premium');
     assert.equal(subscriptionDoc.maxMembers, 25);
     assert.equal(subscriptionDoc.maxTables, 50);
     assert.equal(createdHistory.length, 1);
-    assert.equal(createdHistory[0].planName, 'Pro');
+    assert.equal(createdHistory[0].planName, 'Premium');
     assert.equal(createdActivity.length, 1);
     assert.equal(createdActivity[0].action, 'subscription-update');
   }))));
