@@ -421,6 +421,7 @@ const deleteRecipe = async (req, res) => {
 };
 
 module.exports = {
+  buildInventoryConflictMessage,
   listIngredients,
   listIngredientUnits,
   createIngredientUnit,
