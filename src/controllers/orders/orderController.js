@@ -763,12 +763,11 @@ const updateOrderStatus = async (req, res) => {
       tableNumber: populated.table?.tableNumber,
       branchId: req.branchId
     });
-    await notifyUser({
+    await notifyRole({
       role: 'waiter',
-      userId: populated.createdBy?._id,
       type: 'order:status',
       category: 'order',
-      message: `Kitchen set table ${populated.table?.tableNumber} to ${populated.status}`,
+      message: `Kitchen set KOT for table ${populated.table?.tableNumber || 'Takeaway'} to ${populated.status}`,
       orderId: populated._id,
       tableNumber: populated.table?.tableNumber,
       branchId: req.branchId
